@@ -1,0 +1,10 @@
+model: 'yolov3.json'
+
+batch_size: 32
+epochs: 10
+patience: 3
+confidence_thresh: 0.5
+nms_thresh: 0.5
+classes: 80
+channels: 3
+bn_momentum: 0.9

@@ -1,4 +1,5 @@
-from yolo_layers import RouteLayer, ShortcutLayer, YoloDetectionLayer
+from yolov3.yolo_layers import RouteLayer, ShortcutLayer, YoloDetectionLayer
+from yolov3.configuration import CONFIG
 
 import json, sys
 import torch
@@ -15,33 +16,32 @@ def convolutional(item, out_filters):
 	if item.get('batch_normalize', False) == True:
 		x.add_module('bn', torch.nn.BatchNorm2d(
 			num_features=item.get('filters'),
-			momentum=0.9))
+			momentum=CONFIG.bn_momentum))
 	if item.get('activation', 'linear') == 'leaky':
 		x.add_module('act', torch.nn.LeakyReLU(0.1))
 	out_filters.append(item.get('filters'))
 	return x
 
 def upsample(item, _):
-	return torch.nn.Sequential(torch.nn.Upsample(
-		scale_factor=item.get('stride'),
-		mode='bilinear'))
+	return torch.nn.Upsample(scale_factor=item.get('stride'))
 
 def shortcut(item, out_filters):
 	out_filters.append(out_filters[1:][item.get('from')])
-	return torch.nn.Sequential(ShortcutLayer(item.get('from')))
+	return ShortcutLayer(item.get('from'))
 
 def route(item, out_filters):
 	out_filters.append(sum([out_filters[1:][x] for x in item.get('layers')]))
-	return torch.nn.Sequential(RouteLayer(item.get('layers')))
+	return RouteLayer(item.get('layers'))
 
 def yolo(item, _):
-	return torch.nn.Sequential(YoloDetectionLayer(
+	return YoloDetectionLayer(
 		anchors=list(map(item.get('anchors').__getitem__, item.get('mask'))),
-		num_classes=80))
+		num_classes=CONFIG.classes,
+		device=CONFIG.device)
 
-def build_model_from_cfg(config_file : str):
-	out_filters = list([3])
-	with open(config_file, mode='r') as fd:
+def build_model_from_cfg():
+	out_filters =  list([CONFIG.channels])
+	with open(CONFIG.model, mode='r') as fd:
 		for item in json.load(fd):
 			yield getattr(sys.modules[__name__], item.get('type'))(item, out_filters)
 
@@ -49,16 +49,20 @@ class Network(torch.nn.Module):
 	def __init__(self) -> None:
 		super(Network, self).__init__()
 		self.__outputs = list()
-		self.__model = torch.nn.Sequential(*build_model_from_cfg('yolov3.json'))
+		self.__model = torch.nn.Sequential(*build_model_from_cfg())
 		self.outputs = [x for x in self.__model if isinstance(x, YoloDetectionLayer)]
 		for layer in self.__model.children():
 			layer.register_forward_hook(lambda _, __, out : self.__outputs.append(out))
 
 	def forward(self, inputs):
 		for layer in self.__model:
-			inputs = layer(inputs)
+			if isinstance(layer, RouteLayer):
+				inputs = torch.cat([self.__outputs[idx] for idx in layer.indexes])
+			elif isinstance(layer, ShortcutLayer):
+				inputs = self.__outputs[-1] + self.__outputs[layer.index]
+			elif isinstance(layer, YoloDetectionLayer):
+				continue
+			else:
+				inputs = layer(inputs)
 		self.__outputs.clear()
 		return inputs
-
-if __name__ == '__main__':
-	MODEL = Network()
