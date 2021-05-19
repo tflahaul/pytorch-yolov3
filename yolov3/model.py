@@ -11,7 +11,7 @@ def convolutional(item, out_filters):
 		out_channels=item.get('filters'),
 		kernel_size=item.get('size'),
 		stride=item.get('stride'),
-		padding=(item.get('size') > 1),
+		padding=(item.get('size', 1) - 1) // 2,
 		bias=(not item.get('batch_normalize'))))
 	if item.get('batch_normalize', False) == True:
 		x.add_module('bn', torch.nn.BatchNorm2d(
@@ -22,7 +22,8 @@ def convolutional(item, out_filters):
 	out_filters.append(item.get('filters'))
 	return x
 
-def upsample(item, _):
+def upsample(item, out_filters):
+	out_filters.append(out_filters[-1]) # repeat
 	return torch.nn.Upsample(scale_factor=item.get('stride'))
 
 def shortcut(item, out_filters):
@@ -33,10 +34,12 @@ def route(item, out_filters):
 	out_filters.append(sum([out_filters[1:][x] for x in item.get('layers')]))
 	return RouteLayer(item.get('layers'))
 
-def yolo(item, _):
+def yolo(item, out_filters):
+	out_filters.append(out_filters[-1]) # repeat
 	return YoloDetectionLayer(
-		anchors=list(map(item.get('anchors').__getitem__, item.get('mask'))),
-		num_classes=CONFIG.classes,
+		anchors=[item.get('anchors')[i] for i in item.get('mask')],
+		img_dim=(CONFIG.img_width, CONFIG.img_height),
+		classes=CONFIG.classes,
 		device=CONFIG.device)
 
 def build_model_from_cfg():
@@ -48,21 +51,18 @@ def build_model_from_cfg():
 class Network(torch.nn.Module):
 	def __init__(self) -> None:
 		super(Network, self).__init__()
-		self.__outputs = list()
 		self.__model = torch.nn.Sequential(*build_model_from_cfg())
 		self.outputs = [x for x in self.__model if isinstance(x, YoloDetectionLayer)]
-		for layer in self.__model.children():
-			layer.register_forward_hook(lambda _, __, out : self.__outputs.append(out))
 
 	def forward(self, inputs):
-		for layer in self.__model:
-			if isinstance(layer, RouteLayer):
-				inputs = torch.cat([self.__outputs[idx] for idx in layer.indexes])
-			elif isinstance(layer, ShortcutLayer):
-				inputs = self.__outputs[-1] + self.__outputs[layer.index]
-			elif isinstance(layer, YoloDetectionLayer):
-				continue
+		outputs = list()
+		for layer in self.__model.children():
+			if isinstance(layer, ShortcutLayer):
+				inputs = outputs[-1] + outputs[layer.index]
+			elif isinstance(layer, RouteLayer):
+				inputs = torch.cat([outputs[i] for i in layer.indexes])
 			else:
 				inputs = layer(inputs)
-		self.__outputs.clear()
-		return inputs
+			outputs.append(inputs)
+		out = list([head.x for head in self.outputs])
+		return out if self.training == True else torch.cat(out, 1)

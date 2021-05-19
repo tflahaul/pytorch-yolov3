@@ -1,10 +1,14 @@
 model: 'yolov3.json'
+labels: []
+img_width: 416
+img_height: 416
 
+epochs: 1
 batch_size: 32
-epochs: 10
-patience: 3
-confidence_thresh: 0.5
-nms_thresh: 0.5
+learning_rate: 0.001
+decay: 0.0005
+confidence_thres: 0.5
+nms_thres: 0.4
 classes: 80
 channels: 3
 bn_momentum: 0.9
