@@ -15,24 +15,23 @@ class YoloDetectionLayer(torch.nn.Module):
 		super(YoloDetectionLayer, self).__init__()
 		self.__bbox_attrs = 5 + classes # (tx, ty, tw, th, objness, classes)
 		self.__nb_anchors = len(anchors)
-		self.__imgdim = img_dim[0]
-		self.__anchors = anchors
+		self.__imsize = img_dim
 		self.__device = device
+		self.anchors = anchors
 
-	def __grid_offsets(self, grid_size):
-		g = torch.arange(grid_size)
-		return torch.meshgrid(g, g)
+	def __grid_offsets(self, gs):
+		x = torch.arange(gs, device=self.__device).repeat(gs, 1).view(1, 1, gs, gs)
+		y = torch.arange(gs, device=self.__device).repeat(gs, 1).t().view(1, 1, gs, gs)
+		return torch.stack((x, y), -1)
 
 	def forward(self, inputs):
 		samples, _, ny, nx = inputs.shape
-		stride = self.__imgdim // ny
-		self.g = self.__imgdim // stride
-		self.x = inputs.view(samples, self.__bbox_attrs * self.__nb_anchors, self.g * self.g).transpose(1, 2).contiguous()
-		self.x = self.x.view(samples, self.__nb_anchors * self.g * self.g, self.__bbox_attrs)
-		anchors = torch.Tensor([(aw / stride, ah / stride) for aw, ah in self.__anchors], device=self.__device)
-		xy_offsets = torch.cat(self.__grid_offsets(self.g), 1).repeat(1, self.__nb_anchors).view(-1, 2).unsqueeze(0)
-		self.x[:,:,:2] = torch.sigmoid(self.x[:,:,:2]) + xy_offsets # x, y
-		self.x[:,:,2:4] = torch.exp(self.x[:,:,2:4]) * anchors # w, h
-		self.x[:,:,4:] = torch.sigmoid(self.x[:,:,4:]) # objectness and classes
-		self.x[:,:,:4] *= stride
-		return self.x
+		stride = self.__imsize // ny
+		self.g = self.__imsize // stride
+		self.out = inputs.view(samples, self.__nb_anchors, self.g, self.g, self.__bbox_attrs)
+		self.anchors = torch.Tensor([(aw / stride, ah / stride) for aw, ah in self.anchors], device=self.__device)
+		self.out[...,:2] = torch.sigmoid(self.out[...,:2]) + self.__grid_offsets(self.g)
+		self.out[...,2] = torch.exp(self.out[...,2]) * self.anchors[:,0].view(1, self.__nb_anchors, 1, 1)
+		self.out[...,3] = torch.exp(self.out[...,3]) * self.anchors[:,1].view(1, self.__nb_anchors, 1, 1)
+		self.out[...,4:] = torch.sigmoid(self.out[...,4:])
+		return self.out

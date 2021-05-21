@@ -11,7 +11,7 @@ def convolutional(item, out_filters):
 		out_channels=item.get('filters'),
 		kernel_size=item.get('size'),
 		stride=item.get('stride'),
-		padding=(item.get('size', 1) - 1) // 2,
+		padding=((item.get('size', 1) - 1) // 2),
 		bias=(not item.get('batch_normalize'))))
 	if item.get('batch_normalize', False) == True:
 		x.add_module('bn', torch.nn.BatchNorm2d(
@@ -38,15 +38,15 @@ def yolo(item, out_filters):
 	out_filters.append(out_filters[-1]) # repeat
 	return YoloDetectionLayer(
 		anchors=[item.get('anchors')[i] for i in item.get('mask')],
-		img_dim=(CONFIG.img_width, CONFIG.img_height),
+		img_dim=CONFIG.img_width,
 		classes=CONFIG.classes,
 		device=CONFIG.device)
 
 def build_model_from_cfg():
-	out_filters =  list([CONFIG.channels])
+	filters =  list([CONFIG.channels])
 	with open(CONFIG.model, mode='r') as fd:
 		for item in json.load(fd):
-			yield getattr(sys.modules[__name__], item.get('type'))(item, out_filters)
+			yield getattr(sys.modules[__name__], item.get('type'))(item, filters)
 
 class Network(torch.nn.Module):
 	def __init__(self) -> None:
@@ -56,13 +56,12 @@ class Network(torch.nn.Module):
 
 	def forward(self, inputs):
 		outputs = list()
-		for layer in self.__model.children():
-			if isinstance(layer, ShortcutLayer):
-				inputs = outputs[-1] + outputs[layer.index]
-			elif isinstance(layer, RouteLayer):
-				inputs = torch.cat([outputs[i] for i in layer.indexes])
+		for module in self.__model.children():
+			if isinstance(module, ShortcutLayer):
+				inputs = outputs[-1] + outputs[module.index]
+			elif isinstance(module, RouteLayer):
+				inputs = torch.cat([outputs[i] for i in module.indexes], 1)
 			else:
-				inputs = layer(inputs)
+				inputs = module(inputs)
 			outputs.append(inputs)
-		out = list([head.x for head in self.outputs])
-		return out if self.training == True else torch.cat(out, 1)
+		return list([(x.out, x.anchors) for x in self.outputs])

@@ -1,38 +1,26 @@
 from yolov3.configuration import CONFIG
-
 import torch
 
-def iou(box_a, box_b):
-	ax1, ay1, ax2, ay2 = box_a.t()
-	bx1, by1, bx2, by2 = box_b.t()
-	x1 = torch.max(ax1, bx1)
-	x2 = torch.min(ax2, bx2)
-	y1 = torch.max(ay1, by1)
-	y2 = torch.min(ay2, by2)
-	inter = (1 + x2 - x1) * (1 + y2 - y1)
-	a_area = (1 + ax2 - ax1) * (1 + ay2 - ay1)
-	b_area = (1 + bx2 - bx1) * (1 + by2 - by1)
-	return inter / (1e-8 + (a_area + b_area - inter))
+def iou_wh(box_a, box_b):
+	inter = torch.min(box_a, box_b) * torch.min(box_a, box_b)
+	return (inter / (box_a + box_b)) - inter
 
-def nms(outputs):
-	results = list([None] * len(outputs))
-	for index, out in enumerate(outputs):
-		out = out[out[:,:,4] > CONFIG.confidence_thres]
-		if out.size(0) > 0:
-			score = out[:,4] * out[:,4:].max(1)[0]
-			out = out[(-score).argsort()]
-			cls_conf, cls_pred = out[:,4:].max(1, keepdim=True)
-			detections = torch.cat((out[:,:4], cls_conf, cls_pred), 1)
-			keep_boxes = list()
-			while detections.size(0) > 0:
-				ious = iou(detections[0,:4].unsqueeze(0), detections[:,:4])
-				invalid_mask = (ious > CONFIG.nms_thres) & (detections[0,-1] == detections[:,-1])
-				w = detections[invalid_mask,4:5]
-				detections[0,:4] = (w * detections[invalid_mask,:4]).sum(0) / w.sum()
-				keep_boxes += detections[0]
-			if keep_boxes:
-				results[index] = torch.stack(keep_boxes)
-	return results
-
-def build_targets(outputs, targets):
-	pass
+def build_targets(outputs, anchors, targets):
+	b, a, g, _, _ = outputs.shape # batch, anchors, grid
+	mask = torch.BoolTensor(b, a, g, g, device=CONFIG.device).fill_(False)
+	tx = torch.zeros(b, a, g, g, device=CONFIG.device)
+	ty = torch.zeros(b, a, g, g, device=CONFIG.device)
+	tw = torch.zeros(b, a, g, g, device=CONFIG.device)
+	th = torch.zeros(b, a, g, g, device=CONFIG.device)
+	for batch_idx in range(targets.size(0)):
+		box = targets[batch_idx][...,:4] * g
+		g_xy = box[:,:2]
+		g_wh = box[:,2:4] / anchors[:,None]
+		ious = torch.stack([iou_wh(x, g_wh) for x in anchors])
+		values, indices = ious.max(0)
+		mask[batch_idx, indices, g_xy[1].long(), g_xy[0].long()] = True
+		tx[batch_idx, indices, g_xy[1].long(), g_xy[0].long()] = g_xy[0] - g_xy[0].floor()
+		ty[batch_idx, indices, g_xy[1].long(), g_xy[0].long()] = g_xy[1] - g_xy[1].floor()
+		tw[batch_idx, indices, g_xy[1].long(), g_xy[0].long()] = torch.log(g_wh[0] / (1e-8 + anchors[indices][:,0]))
+		th[batch_idx, indices, g_xy[1].long(), g_xy[0].long()] = torch.log(g_wh[1] / (1e-8 + anchors[indices][:,1]))
+	return mask, tx, ty, tw, th, None

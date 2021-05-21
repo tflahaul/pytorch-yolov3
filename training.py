@@ -1,5 +1,6 @@
 from torchvision import transforms as tsfrm
 from argparse import ArgumentParser
+
 from yolov3.configuration import CONFIG
 from yolov3.model import Network
 from yolov3.yolo_loss import *
@@ -9,14 +10,18 @@ import torch
 import csv
 import os
 
+__mse__ = torch.nn.MSELoss()
+__bce__ = torch.nn.BCELoss()
+
 class AnnotatedImagesDataset(torch.utils.data.Dataset):
 	def __init__(self, images, targets) -> None:
 		super(AnnotatedImagesDataset, self).__init__()
-		self.X = list(sorted([os.path.join(images, item) for item in os.listdir(images)]))
-		self.y = list(sorted([os.path.join(targets, item) for item in os.listdir(targets)]))
+		self.X = sorted([os.path.join(images, item) for item in os.listdir(images)])
+		self.y = sorted([os.path.join(targets, item) for item in os.listdir(targets)])
 		assert len(self.X) == len(self.y)
 		self.transform = tsfrm.Compose([
 			tsfrm.Resize((CONFIG.img_height, CONFIG.img_width)),
+			tsfrm.RandomGrayscale(p=0.1),
 			tsfrm.ToTensor()])
 
 	def __getitem__(self, index):
@@ -33,24 +38,30 @@ class AnnotatedImagesDataset(torch.utils.data.Dataset):
 		return len(self.X)
 
 def regressor(outputs, targets):
-	attributes = list()
-	for item in outputs:
-		attributes.append(build_targets(item, targets))
-	raise SystemExit
+	losses = list()
+	for output, anchors in outputs:
+		mask, tx, ty, tw, th, _ = build_targets(output, anchors, targets)
+		loss_x = __mse__(outputs[...,0][mask], tx[mask])
+		loss_y = __mse__(outputs[...,1][mask], ty[mask])
+		loss_w = __mse__(outputs[...,2][mask], tw[mask])
+		loss_h = __mse__(outputs[...,3][mask], th[mask])
+		losses.append(loss_x + loss_y + loss_w + loss_h)
+	return sum(losses)
 
 def fit(model, X, y, num_cpu) -> None:
 	dataset = torch.utils.data.DataLoader(
 		dataset=AnnotatedImagesDataset(X, y),
 		batch_size=CONFIG.batch_size,
-		num_workers=num_cpu)
+		num_workers=num_cpu,
+		pin_memory=True)
 	optimizer = torch.optim.AdamW(
 		params=model.parameters(),
 		weight_decay=CONFIG.decay,
 		lr=CONFIG.learning_rate)
 	scheduler = torch.optim.lr_scheduler.StepLR(
 		optimizer=optimizer,
-		step_size=20, # tbd
-		gamma=0.8)
+		step_size=(CONFIG.epochs // 2),
+		gamma=CONFIG.lr_decay)
 	model.train()
 	for epoch in range(CONFIG.epochs):
 		running_loss = 0.0
@@ -61,7 +72,7 @@ def fit(model, X, y, num_cpu) -> None:
 			loss.backward()
 			optimizer.step()
 			running_loss = running_loss + loss.item()
-		print(f'epoch {(epoch + 1):<2d}/{CONFIG.epochs:<2d}, loss={running_loss:.6f}')
+		print(f'epoch {(epoch + 1):>2d}/{CONFIG.epochs:>2d}, loss={running_loss:.6f}')
 		scheduler.step()
 
 def main() -> None:
@@ -74,11 +85,9 @@ def main() -> None:
 	arguments = parser.parse_args()
 	if not arguments.disable_cuda and torch.cuda.is_available() == True:
 		setattr(CONFIG, 'device', 'cuda:' + str(arguments.gpu))
-	else:
-		setattr(CONFIG, 'device', 'cpu')
 	model = Network().to(CONFIG.device)
 	fit(model, arguments.images, arguments.targets, arguments.num_cpu)
-	torch.save(model.state_dict(), 'yolov3.torch')
+#	torch.save(model.state_dict(), 'yolov3.torch')
 
 if __name__ == '__main__':
 	main()
