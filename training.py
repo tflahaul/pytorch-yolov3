@@ -41,26 +41,25 @@ def regressor(outputs, targets):
 	losses = list()
 	for output, anchors in outputs:
 		mask, tx, ty, tw, th, _ = build_targets(output, anchors, targets)
-		loss_x = __mse__(outputs[...,0][mask], tx[mask])
-		loss_y = __mse__(outputs[...,1][mask], ty[mask])
-		loss_w = __mse__(outputs[...,2][mask], tw[mask])
-		loss_h = __mse__(outputs[...,3][mask], th[mask])
-		losses.append(loss_x + loss_y + loss_w + loss_h)
+		loss_x = __mse__(output[...,0][mask], tx[mask])
+		loss_y = __mse__(output[...,1][mask], ty[mask])
+#		loss_w = __mse__(output[...,2][mask], tw[mask])
+#		loss_h = __mse__(output[...,3][mask], th[mask])
+		losses.append(loss_x + loss_y)
 	return sum(losses)
 
 def fit(model, X, y, num_cpu) -> None:
 	dataset = torch.utils.data.DataLoader(
 		dataset=AnnotatedImagesDataset(X, y),
 		batch_size=CONFIG.batch_size,
-		num_workers=num_cpu,
-		pin_memory=True)
+		num_workers=num_cpu)
 	optimizer = torch.optim.AdamW(
 		params=model.parameters(),
 		weight_decay=CONFIG.decay,
 		lr=CONFIG.learning_rate)
 	scheduler = torch.optim.lr_scheduler.StepLR(
 		optimizer=optimizer,
-		step_size=(CONFIG.epochs // 2),
+		step_size=(CONFIG.epochs // 3),
 		gamma=CONFIG.lr_decay)
 	model.train()
 	for epoch in range(CONFIG.epochs):
