@@ -1,16 +1,6 @@
 from yolov3.configuration import CONFIG
 import torch
 
-class YOLOv3Loss(torch.nn.Module):
-	def __init__(self, ignore_thres=0.5) -> None:
-		super(YOLOv3Loss, self).__init__()
-		self.__threshold = ignore_thres
-		self.__mse = torch.nn.MSELoss()
-		self.__bce = torch.nn.BCELoss()
-
-	def forward(self, outputs, targets):
-		pass
-
 def iou_wh(box1, box2):
 	inter = torch.min(box1[0], box2[0]) * torch.min(box1[1], box2[1])
 	union = (1e-8 + (box1[0] * box1[1])) + (box2[0] * box2[1]) - inter
@@ -23,12 +13,17 @@ def build_targets(outputs, anchors, targets):
 	ty = torch.zeros(b, a, g, g, device=CONFIG.device)
 	tw = torch.zeros(b, a, g, g, device=CONFIG.device)
 	th = torch.zeros(b, a, g, g, device=CONFIG.device)
+	tc = torch.zeros(b, a, g, g, CONFIG.classes, device=CONFIG.device)
 	for batch_idx in range(targets.size(0)):
-		g_xy = targets[batch_idx][...,:2].squeeze(0) * g
-		g_wh = targets[batch_idx][...,2:4].squeeze(0) * g
-		ious = torch.stack([iou_wh(x, g_wh) for x in anchors])
-		indices = ious.max(0)[1]
-		mask[batch_idx, indices, g_xy[0].long(), g_xy[1].long()] = True
-		tx[batch_idx, indices, g_xy[0].long(), g_xy[1].long()] = g_xy[0] - g_xy[0].floor()
-		ty[batch_idx, indices, g_xy[0].long(), g_xy[1].long()] = g_xy[1] - g_xy[1].floor()
-	return mask, tx, ty, tw, th, None
+		for target in targets[batch_idx]:
+			g_xy = target[:2] * g
+			g_wh = target[2:4] * g
+			ious = torch.stack([iou_wh(x, g_wh) for x in anchors])
+			_, index = ious.max(0)
+			mask[batch_idx, index, int(g_xy[0]), int(g_xy[1])] = True
+			tx[batch_idx, index, int(g_xy[0]), int(g_xy[1])] = g_xy[0] - int(g_xy[0])
+			ty[batch_idx, index, int(g_xy[0]), int(g_xy[1])] = g_xy[1] - int(g_xy[1])
+#			tw[batch_idx, index, int(g_xy[0]), int(g_xy[1])] = torch.log(1e-8 + (g_wh[1] / anchors[index][1]))
+#			th[batch_idx, index, int(g_xy[0]), int(g_xy[1])] = torch.log(1e-8 + (g_wh[0] / anchors[index][0]))
+			tc[batch_idx, index, int(g_xy[0]), int(g_xy[1]), int(target[-1])] = 1.0
+	return mask, tx, ty, tw, th, tc

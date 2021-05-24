@@ -40,12 +40,13 @@ class AnnotatedImagesDataset(torch.utils.data.Dataset):
 def regressor(outputs, targets):
 	losses = list()
 	for output, anchors in outputs:
-		mask, tx, ty, tw, th, _ = build_targets(output, anchors, targets)
+		mask, tx, ty, tw, th, tc = build_targets(output, anchors, targets)
 		loss_x = __mse__(output[...,0][mask], tx[mask])
 		loss_y = __mse__(output[...,1][mask], ty[mask])
-#		loss_w = __mse__(output[...,2][mask], tw[mask])
+		loss_c = __bce__(output[...,5:][mask], tc[mask])
+#		loss_w = __mse__(output[...,2][mask], tw[mask]) ??
 #		loss_h = __mse__(output[...,3][mask], th[mask])
-		losses.append(loss_x + loss_y)
+		losses.append(loss_x + loss_y + loss_c)
 	return sum(losses)
 
 def fit(model, X, y, num_cpu) -> None:
