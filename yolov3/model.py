@@ -64,4 +64,4 @@ class Network(torch.nn.Module):
 			else:
 				inputs = module(inputs)
 			outputs.append(inputs)
-		return list([(x.out, x.anchors) for x in self.outputs])
+		return list([(x.out, x.scaled_anchors) for x in self.outputs])
