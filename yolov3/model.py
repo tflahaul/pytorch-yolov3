@@ -38,7 +38,7 @@ def yolo(item, out_filters):
 	out_filters.append(out_filters[-1]) # repeat
 	return YoloDetectionLayer(
 		anchors=[item.get('anchors')[i] for i in item.get('mask')],
-		img_dim=CONFIG.img_width,
+		img_dim=CONFIG.img_dim,
 		classes=CONFIG.classes,
 		device=CONFIG.device)
 
@@ -52,7 +52,7 @@ class Network(torch.nn.Module):
 	def __init__(self) -> None:
 		super(Network, self).__init__()
 		self.__model = torch.nn.Sequential(*build_model_from_cfg())
-		self.outputs = [x for x in self.__model if isinstance(x, YoloDetectionLayer)]
+		self.heads = [x for x in self.__model if isinstance(x, YoloDetectionLayer)]
 
 	def forward(self, inputs):
 		outputs = list()
@@ -64,4 +64,6 @@ class Network(torch.nn.Module):
 			else:
 				inputs = module(inputs)
 			outputs.append(inputs)
-		return list([(x.out, x.scaled_anchors) for x in self.outputs])
+		if self.training == True:
+			return list([(x.out, x.scaled_anchors) for x in self.heads])
+		return list([x.out for x in self.heads])

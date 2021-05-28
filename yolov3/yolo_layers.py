@@ -34,4 +34,8 @@ class YoloDetectionLayer(torch.nn.Module):
 		self.out[...,2] = torch.exp(self.out[...,2]) * self.scaled_anchors[:,0].view(1, self.__nb_anchors, 1, 1)
 		self.out[...,3] = torch.exp(self.out[...,3]) * self.scaled_anchors[:,1].view(1, self.__nb_anchors, 1, 1)
 		self.out[...,4:] = torch.sigmoid(self.out[...,4:])
+		if self.training == False:
+			self.out = torch.cat((
+				self.out[...,:4].view(samples, -1, 4) * stride,
+				self.out[...,4:].view(samples, -1, self.__bbox_attrs - 4)), -1)
 		return self.out

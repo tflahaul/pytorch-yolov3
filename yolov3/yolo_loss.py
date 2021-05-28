@@ -19,7 +19,6 @@ class YOLOv3Loss(torch.nn.Module):
 		union = (1e-8 + (box1[0] * box1[1])) + (box2[0] * box2[1]) - inter
 		return inter / union
 
-	@torch.no_grad()
 	def __build_targets(self, outputs, anchors, targets):
 		b, a, g, _, _ = outputs.shape # batch, anchors, grid size
 		mask = torch.BoolTensor(b, a, g, g, device=CONFIG.device).fill_(False)
@@ -31,14 +30,14 @@ class YOLOv3Loss(torch.nn.Module):
 		for batch_idx in range(targets.size(0)):
 			for target in targets[batch_idx]:
 				g_xy = target[:2] * g
-				g_wh = torch.abs(target[2:4] - target[:2]) * g
+				g_wh = (torch.abs(target[2:4] - target[:2]) * CONFIG.img_dim) * g
 				ious = torch.stack([self.__iou_wh(x, g_wh) for x in anchors])
 				value, best = ious.max(0)
 				mask[batch_idx, best, int(g_xy[0]), int(g_xy[1])] = True
 				tx[batch_idx, best, int(g_xy[0]), int(g_xy[1])] = g_xy[0] - g_xy[0].floor()
 				ty[batch_idx, best, int(g_xy[0]), int(g_xy[1])] = g_xy[1] - g_xy[1].floor()
-				tw[batch_idx, best, int(g_xy[0]), int(g_xy[1])] = torch.log(g_wh[0] / (1e-8 + anchors[best][0]))
-				th[batch_idx, best, int(g_xy[0]), int(g_xy[1])] = torch.log(g_wh[1] / (1e-8 + anchors[best][1]))
+				tw[batch_idx, best, int(g_xy[0]), int(g_xy[1])] = torch.log(g_wh[0] / anchors[best][0])
+				th[batch_idx, best, int(g_xy[0]), int(g_xy[1])] = torch.log(g_wh[1] / anchors[best][1])
 				tc[batch_idx, best, int(g_xy[0]), int(g_xy[1]), int(target[-1])] = 1.0
 		return mask, tx, ty, tw, th, tc
 
