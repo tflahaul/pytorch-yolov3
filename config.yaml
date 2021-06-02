@@ -1,18 +1,18 @@
 ## General
 model: 'yolov3.json'
 labels: ['person', 'dog', 'car']
-img_dim: 416
+img_dim: 608
 device: 'cpu'
 version: 0.1
 
-## Hyper-parameters
-epochs: 50
+## Training hyper-parameters
+epochs: 80
 batch_size: 32
 learning_rate: 0.001
-lr_decay: 0.9
+lr_decay: 0.8
 decay: 0.0005
 confidence_thres: 0.5
-iou_thres: 0.5
+nms_thres: 0.5
 classes: 80
 channels: 3
 bn_momentum: 0.9

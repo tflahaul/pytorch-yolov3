@@ -1,7 +1,7 @@
 from yolov3.configuration import CONFIG
 from yolov3.yolo_loss import YOLOv3Loss
-from yolov3.model import Network
-from argparse import ArgumentParser, ArgumentTypeError
+from yolov3.network import Network
+from argparse import ArgumentParser
 
 import torchvision.transforms as tsfrm
 import torchvision.io as io
@@ -55,7 +55,7 @@ def fit(model, X, y) -> None:
 			loss = criterion(outputs, targets)
 			loss.backward()
 			optimizer.step()
-			running_loss = running_loss + loss.item()
+			running_loss += loss.item()
 		print(f'epoch {(epoch + 1):>2d}/{CONFIG.epochs:>2d}, loss={running_loss:.6f}, {str(criterion)}')
 		scheduler.step()
 
@@ -68,11 +68,13 @@ def main() -> None:
 	parser.add_argument('--disable-cuda', action='store_true', help='Disable CUDA')
 	arguments = parser.parse_args()
 	if not arguments.disable_cuda and torch.cuda.is_available() == True:
-		setattr(CONFIG, 'device', 'cuda:' + str(arguments.gpu))
+		setattr(CONFIG, 'device', torch.device('cuda:' + str(arguments.gpu)))
 	if arguments.load and os.path.exists(arguments.load):
+		print('Loading model, it might take some time...')
 		model = torch.load(arguments.load, map_location=CONFIG.device)
 	else:
-		model = Network().to(CONFIG.device)
+		model = Network()
+	model.to(CONFIG.device)
 	fit(model, arguments.images, arguments.targets)
 	torch.save(model, f'pytorch-yolov3-v{CONFIG.version}.pth')
 

@@ -13,9 +13,9 @@ class ShortcutLayer(torch.nn.Module):
 class YoloDetectionLayer(torch.nn.Module):
 	def __init__(self, anchors, img_dim, classes, device) -> None:
 		super(YoloDetectionLayer, self).__init__()
-		self.__bbox_attrs = (5 + classes) # (tx, ty, tw, th, objness, classes)
+		self.__bbox_attrs = (5 + classes) # (tx, ty, tw, th, obj, cls)
+		self.__anchors = torch.Tensor(anchors, device=device)
 		self.__nb_anchors = len(anchors)
-		self.__anchors = anchors
 		self.__imsize = img_dim
 		self.__device = device
 
@@ -29,13 +29,13 @@ class YoloDetectionLayer(torch.nn.Module):
 		stride = self.__imsize // ny
 		g = self.__imsize // stride
 		self.out = inputs.view(samples, self.__nb_anchors, g, g, self.__bbox_attrs)
-		self.scaled_anchors = torch.Tensor([(aw / stride, ah / stride) for aw, ah in self.__anchors], device=self.__device)
-		self.out[...,:2] = torch.sigmoid(self.out[...,:2]) + self.__grid_offsets(g)
-		self.out[...,2] = torch.exp(self.out[...,2]) * self.scaled_anchors[:,0].view(1, self.__nb_anchors, 1, 1)
-		self.out[...,3] = torch.exp(self.out[...,3]) * self.scaled_anchors[:,1].view(1, self.__nb_anchors, 1, 1)
+		self.scaled_anchors = self.__anchors / stride
+		self.out[...,:2] = torch.sigmoid(self.out[...,:2])
 		self.out[...,4:] = torch.sigmoid(self.out[...,4:])
-		if self.training == False:
-			self.out = torch.cat((
-				self.out[...,:4].view(samples, -1, 4) * stride,
-				self.out[...,4:].view(samples, -1, self.__bbox_attrs - 4)), -1)
+		self.pred = self.out.detach().clone()
+		self.pred[...,:2] = self.pred[...,:2] + self.__grid_offsets(g)
+		self.pred[...,2:4] = self.pred[...,2:4].exp() * self.scaled_anchors.view(1, -1, 1, 1, 2)
+		if not self.training:
+			self.out = self.pred.view(samples, -1, self.__bbox_attrs)
+			self.out[...,:4] = self.out[...,:4] * stride
 		return self.out

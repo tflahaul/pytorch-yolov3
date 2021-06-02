@@ -65,5 +65,5 @@ class Network(torch.nn.Module):
 				inputs = module(inputs)
 			outputs.append(inputs)
 		if self.training == True:
-			return list([(x.out, x.scaled_anchors) for x in self.heads])
+			return list([(x.out, x.pred, x.scaled_anchors) for x in self.heads])
 		return list([x.out for x in self.heads])
