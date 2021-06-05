@@ -11,7 +11,7 @@ def convolutional(item, out_filters):
 		out_channels=item.get('filters'),
 		kernel_size=item.get('size'),
 		stride=item.get('stride'),
-		padding=((item.get('size', 1) - 1) // 2),
+		padding=((item.get('size', 1) - 1)//2),
 		bias=(not item.get('batch_normalize'))))
 	if item.get('batch_normalize', False) == True:
 		x.add_module('bn', torch.nn.BatchNorm2d(

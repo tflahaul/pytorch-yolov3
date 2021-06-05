@@ -1,62 +1,59 @@
+from torchvision.ops._box_convert import _box_xyxy_to_cxcywh
 from yolov3.configuration import CONFIG
-import yolov3.utils as utils
+
 import torch
 
 class YOLOv3Loss(torch.nn.Module):
 	def __init__(self) -> None:
 		super(YOLOv3Loss, self).__init__()
+		self.__init_metrics = torch.zeros(6, device=CONFIG.device)
 		self.__mse = torch.nn.MSELoss()
 		self.__bce = torch.nn.BCELoss()
-		self.metrics = list([0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
 
 	def __str__(self):
 		return (f'x={self.metrics[0]:.2f}, y={self.metrics[1]:.2f}, '
 			f'w={self.metrics[2]:.2f}, h={self.metrics[3]:.2f}, '
 			f'obj={self.metrics[4]:.2f}, cls={self.metrics[5]:.2f}')
 
-	@torch.no_grad()
-	def __anchors_iou(self, box1, box2):
-		inter = torch.min(box1[0], box2[0]) * torch.min(box1[1], box2[1])
-		union = (1e-8 + (box1[0] * box1[1])) + (box2[0] * box2[1]) - inter
-		return inter / union
+	def __anchors_iou(self, anchor, boxes):
+		inter = torch.min(anchor[0], boxes[:,0]) * torch.min(anchor[1], boxes[:,1])
+		union = (anchor[0] * anchor[1]) + (boxes[:,0] * boxes[:,1]) - inter
+		return inter / (1e-8 + union)
 
 	@torch.no_grad()
-	def __build_targets(self, outputs, anchors, targets):
-		b, a, g, _, _ = outputs.shape # batch, anchors, grid size
-		mask = torch.BoolTensor(b, a, g, g, device=CONFIG.device).fill_(False)
+	def __build_targets(self, output_shape, anchors, targets):
+		b, a, g, g, _ = output_shape # batch, anchors, grid size
 		no_mask = torch.BoolTensor(b, a, g, g, device=CONFIG.device).fill_(True)
-		tx = torch.zeros(b, a, g, g, device=CONFIG.device)
-		ty = torch.zeros(b, a, g, g, device=CONFIG.device)
-		tw = torch.zeros(b, a, g, g, device=CONFIG.device)
-		th = torch.zeros(b, a, g, g, device=CONFIG.device)
-		tc = torch.zeros(b, a, g, g, CONFIG.classes, device=CONFIG.device)
-		for batch_idx in range(targets.size(0)):
-			for target in targets[batch_idx]:
-				boxes = utils.xyxy2xywh(target[:4]) * g
-				ious = torch.stack([self.__anchors_iou(x, boxes[2:4]) for x in anchors])
-				value, best = ious.max(0)
-				mask[batch_idx, best, int(boxes[1]), int(boxes[0])] = True
-				no_mask[batch_idx, best, int(boxes[1]), int(boxes[0])] = False
-				for index, item in enumerate(ious):
-					if item > CONFIG.confidence_thres:
-						no_mask[batch_idx, index, int(boxes[1]), int(boxes[0])] = False
-				tx[batch_idx, best, int(boxes[1]), int(boxes[0])] = boxes[0] - boxes[0].floor()
-				ty[batch_idx, best, int(boxes[1]), int(boxes[0])] = boxes[1] - boxes[1].floor()
-				tw[batch_idx, best, int(boxes[1]), int(boxes[0])] = torch.log(boxes[2] / anchors[best][0])
-				th[batch_idx, best, int(boxes[1]), int(boxes[0])] = torch.log(boxes[3] / anchors[best][1])
-				tc[batch_idx, best, int(boxes[1]), int(boxes[0]), int(target[-1])] = 1.0
-		return mask, no_mask, tx, ty, tw, th, tc
+		mask = torch.BoolTensor(b, a, g, g, device=CONFIG.device).fill_(False)
+		tcls = torch.zeros(b, a, g, g, CONFIG.classes, device=CONFIG.device)
+		xywh = torch.zeros(4, b, a, g, g, device=CONFIG.device)
+		for batch in range(targets.size(0)):
+			boxes = _box_xyxy_to_cxcywh(targets[batch,:,:4]) * g
+			gx, gy = boxes[:,:2].t().long()
+			ious = torch.stack([self.__anchors_iou(x, boxes[:,2:4]) for x in anchors])
+			_, best = ious.max(0)
+			xywh[0, batch, best, gy, gx] = boxes[:,0] - boxes[:,0].floor()
+			xywh[1, batch, best, gy, gx] = boxes[:,1] - boxes[:,1].floor()
+			xywh[2, batch, best, gy, gx] = torch.log(1e-8 + (boxes[:,2] / anchors[best,0]))
+			xywh[3, batch, best, gy, gx] = torch.log(1e-8 + (boxes[:,3] / anchors[best,1]))
+			tcls[batch, best, gy, gx, targets[batch,:,-1].long()] = 1.0
+			no_mask[batch, best, gy, gx] = False
+			mask[batch, best, gy, gx] = True
+			for index, item in enumerate(ious):
+				if any(item > CONFIG.confidence_thres):
+					no_mask[batch, index, gy, gx] = False
+		return mask, no_mask, xywh, tcls
 
 	def forward(self, outputs, targets):
-		self.metrics = list([0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
+		self.metrics = self.__init_metrics.detach().clone()
 		for output, prediction, anchors in outputs:
-			mask, no_mask, tx, ty, tw, th, tc = self.__build_targets(prediction, anchors, targets)
-			self.metrics[0] += self.__mse(output[...,0][mask], tx[mask])
-			self.metrics[1] += self.__mse(output[...,1][mask], ty[mask])
-			self.metrics[2] += self.__mse(output[...,2][mask], tw[mask])
-			self.metrics[3] += self.__mse(output[...,3][mask], th[mask])
+			mask, no_mask, txywh, classes = self.__build_targets(prediction.shape, anchors, targets)
+			self.metrics[0] += self.__mse(output[...,0][mask], txywh[0][mask])
+			self.metrics[1] += self.__mse(output[...,1][mask], txywh[1][mask])
+			self.metrics[2] += self.__mse(output[...,2][mask], txywh[2][mask])
+			self.metrics[3] += self.__mse(output[...,3][mask], txywh[3][mask])
 			obj_loss = self.__bce(output[...,4][mask], mask.float()[mask])
-			noobj_loss = self.__bce(output[...,4][no_mask], mask.float()[no_mask]) * 100.0
-			self.metrics[4] += (obj_loss + noobj_loss)
-			self.metrics[5] += self.__bce(output[...,5:][mask], tc[mask])
+			noobj_loss = self.__bce(output[...,4][no_mask], mask.float()[no_mask])
+			self.metrics[4] += (obj_loss + (100.0 * noobj_loss))
+			self.metrics[5] += self.__bce(output[...,5:][mask], classes[mask])
 		return sum(self.metrics)

@@ -1,7 +1,7 @@
 ## General
-model: 'yolov3.json'
+model: 'yolov3-config.json'
 labels: ['person', 'dog', 'car']
-img_dim: 608
+img_dim: 416 # must be a multiple of 32
 device: 'cpu'
 version: 0.1
 

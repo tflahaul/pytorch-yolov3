@@ -1,7 +1,13 @@
-# data folders
-images
+# train/test data
 targets
+images
+*.csv
+*.png
 
 # pytorch models
 *.pth
 *.pt
+
+# python
+__pycache__
+*.pyc

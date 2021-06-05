@@ -12,9 +12,9 @@ import os
 class AnnotatedImagesDataset(torch.utils.data.Dataset):
 	def __init__(self, images, targets) -> None:
 		super(AnnotatedImagesDataset, self).__init__()
-		self.X = sorted([os.path.join(images, item) for item in os.listdir(images)])
-		self.y = sorted([os.path.join(targets, item) for item in os.listdir(targets)])
-		assert len(self.X) == len(self.y), f'got {len(self.X)} imgs but {len(self.y)} targets'
+		self.__X = sorted([os.path.join(images, item) for item in os.listdir(images)])
+		self.__y = sorted([os.path.join(targets, item) for item in os.listdir(targets)])
+		assert len(self.__X) == len(self.__y), f'got {len(self.__X)} imgs but {len(self.__y)} targets'
 		self.transform = tsfrm.Compose([
 			tsfrm.Resize((CONFIG.img_dim, CONFIG.img_dim)),
 			tsfrm.RandomGrayscale(p=0.1),
@@ -22,8 +22,8 @@ class AnnotatedImagesDataset(torch.utils.data.Dataset):
 
 	def __getitem__(self, index):
 		bbox_attrs = list()
-		img = self.transform(io.read_image(self.X[index], io.image.ImageReadMode.RGB))
-		with open(self.y[index], mode='r', newline='') as fd:
+		img = self.transform(io.read_image(self.__X[index], io.image.ImageReadMode.RGB))
+		with open(self.__y[index], mode='r', newline='') as fd:
 			for ann in csv.reader(fd, quoting=csv.QUOTE_NONNUMERIC):
 				label = torch.Tensor([CONFIG.labels.index(ann[0])])
 				coords = torch.Tensor(ann[1:])
@@ -31,7 +31,7 @@ class AnnotatedImagesDataset(torch.utils.data.Dataset):
 		return img.to(CONFIG.device), torch.stack(bbox_attrs).to(CONFIG.device)
 
 	def __len__(self):
-		return len(self.X)
+		return len(self.__X)
 
 def fit(model, X, y) -> None:
 	dataset = torch.utils.data.DataLoader(
