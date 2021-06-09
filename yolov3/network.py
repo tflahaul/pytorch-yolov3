@@ -1,5 +1,5 @@
-from yolov3.yolo_layers import RouteLayer, ShortcutLayer, YoloDetectionLayer
 from yolov3.configuration import CONFIG
+from yolov3.yolo_layers import *
 
 import json, sys
 import torch

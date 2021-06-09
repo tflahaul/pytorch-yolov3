@@ -9,34 +9,39 @@ import torch
 import csv
 import os
 
-class AnnotatedImagesDataset(torch.utils.data.Dataset):
-	def __init__(self, images, targets) -> None:
-		super(AnnotatedImagesDataset, self).__init__()
-		self.__X = sorted([os.path.join(images, item) for item in os.listdir(images)])
-		self.__y = sorted([os.path.join(targets, item) for item in os.listdir(targets)])
+class DetectionDataset(torch.utils.data.Dataset):
+	def __init__(self, dataset_dir : str) -> None:
+		super(DetectionDataset, self).__init__()
+		dirs = sorted([d.path for d in os.scandir(dataset_dir) if d.is_dir()])
+		self.__X = sorted([os.path.join(dirs[0], item) for item in os.listdir(dirs[0])])
+		self.__y = sorted([os.path.join(dirs[1], item) for item in os.listdir(dirs[1])])
 		assert len(self.__X) == len(self.__y), f'got {len(self.__X)} imgs but {len(self.__y)} targets'
-		self.transform = tsfrm.Compose([
+		self.__transform = tsfrm.Compose([
 			tsfrm.Resize((CONFIG.img_dim, CONFIG.img_dim)),
 			tsfrm.RandomGrayscale(p=0.1),
 			tsfrm.ConvertImageDtype(torch.float32)])
 
-	def __getitem__(self, index):
+	def __getitem__(self, index : int):
 		bbox_attrs = list()
-		img = self.transform(io.read_image(self.__X[index], io.image.ImageReadMode.RGB))
+		img = self.__transform(io.read_image(self.__X[index], io.image.ImageReadMode.RGB))
 		with open(self.__y[index], mode='r', newline='') as fd:
 			for ann in csv.reader(fd, quoting=csv.QUOTE_NONNUMERIC):
-				label = torch.Tensor([CONFIG.labels.index(ann[0])])
-				coords = torch.Tensor(ann[1:])
-				bbox_attrs.append(torch.cat((coords, label), -1))
+				bbox = list([index] + ann[1:] + [CONFIG.labels.index(ann[0])])
+			bbox_attrs.append(torch.Tensor(bbox))
 		return img.to(CONFIG.device), torch.stack(bbox_attrs).to(CONFIG.device)
 
-	def __len__(self):
+	def __len__(self) -> int:
 		return len(self.__X)
 
-def fit(model, X, y) -> None:
+def collate_batch_items(items : list):
+	return torch.stack((list(zip(*items)))[0]), torch.cat((list(zip(*items)))[1])
+
+def fit(model, dataset_dir : str) -> None:
 	dataset = torch.utils.data.DataLoader(
-		dataset=AnnotatedImagesDataset(X, y),
-		batch_size=CONFIG.batch_size)
+		dataset=DetectionDataset(dataset_dir),
+		batch_size=CONFIG.batch_size,
+		collate_fn=collate_batch_items,
+		pin_memory=True)
 	optimizer = torch.optim.AdamW(
 		params=model.parameters(),
 		weight_decay=CONFIG.decay,
@@ -61,13 +66,12 @@ def fit(model, X, y) -> None:
 
 def main() -> None:
 	parser = ArgumentParser(description='YOLOv3 training script')
-	parser.add_argument('images', type=str, help='Directory where images are stored')
-	parser.add_argument('targets', type=str, help='Directory where targets are stored')
-	parser.add_argument('--load', type=str, metavar='MODEL', help='Loads model')
-	parser.add_argument('--gpu', type=int, default=0, help='Index of GPU')
-	parser.add_argument('--disable-cuda', action='store_true', help='Disable CUDA')
+	parser.add_argument('dataset', type=str, help='dataset folder')
+	parser.add_argument('--load', type=str, metavar='MODEL', help='loads model')
+	parser.add_argument('--gpu', type=int, default=0, help='GPU index')
+	parser.add_argument('--enable-cuda', action='store_true', help='enable CUDA')
 	arguments = parser.parse_args()
-	if not arguments.disable_cuda and torch.cuda.is_available() == True:
+	if arguments.enable_cuda and torch.cuda.is_available():
 		setattr(CONFIG, 'device', torch.device('cuda:' + str(arguments.gpu)))
 	if arguments.load and os.path.exists(arguments.load):
 		print('Loading model, it might take some time...')
@@ -75,7 +79,7 @@ def main() -> None:
 	else:
 		model = Network()
 	model.to(CONFIG.device)
-	fit(model, arguments.images, arguments.targets)
+	fit(model, arguments.dataset)
 	torch.save(model, f'pytorch-yolov3-v{CONFIG.version}.pth')
 
 if __name__ == '__main__':
