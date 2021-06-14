@@ -38,9 +38,8 @@ def yolo(item, out_filters):
 	out_filters.append(out_filters[-1]) # repeat
 	return YoloDetectionLayer(
 		anchors=[item.get('anchors')[i] for i in item.get('mask')],
-		img_dim=CONFIG.img_dim,
-		classes=CONFIG.classes,
-		device=CONFIG.device)
+		img_size=CONFIG.img_dim,
+		classes=CONFIG.classes).to(CONFIG.device)
 
 def build_model_from_cfg():
 	filters =  list([CONFIG.channels])

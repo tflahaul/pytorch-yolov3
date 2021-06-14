@@ -6,7 +6,6 @@ import torch
 class YOLOv3Loss(torch.nn.Module):
 	def __init__(self) -> None:
 		super(YOLOv3Loss, self).__init__()
-		self.__init_metrics = torch.zeros(6, device=CONFIG.device)
 		self.__mse = torch.nn.MSELoss()
 		self.__bce = torch.nn.BCELoss()
 
@@ -23,29 +22,28 @@ class YOLOv3Loss(torch.nn.Module):
 	@torch.no_grad()
 	def __build_targets(self, output_shape, anchors, targets):
 		b, a, g, g, _ = output_shape # batch, anchors, grid size
-		no_mask = torch.full((b, a, g, g), True, dtype=torch.bool, device=CONFIG.device)
-		mask = torch.full((b, a, g, g), False, dtype=torch.bool, device=CONFIG.device)
-		tcls = torch.zeros(b, a, g, g, CONFIG.classes, device=CONFIG.device)
-		xywh = torch.zeros(4, b, a, g, g, device=CONFIG.device)
+		no_mask = torch.full((b, a, g, g), True, dtype=torch.bool)
+		mask = torch.full((b, a, g, g), False, dtype=torch.bool)
+		tcls = torch.zeros(b, a, g, g, CONFIG.classes)
+		xywh = torch.zeros(4, b, a, g, g)
 		sample = targets[:, 0].long()
-		boxes = _box_xyxy_to_cxcywh(targets[sample, 1:5]) * g
+		boxes = _box_xyxy_to_cxcywh(targets[:, 1:5]) * g
 		gx, gy = boxes[:, :2].t().long()
 		ious = torch.stack([self.__anchors_iou(x, boxes[:, 2:4]) for x in anchors])
 		_, best = ious.max(0)
 		xywh[0, sample, best, gy, gx] = boxes[:, 0] - boxes[:, 0].floor()
 		xywh[1, sample, best, gy, gx] = boxes[:, 1] - boxes[:, 1].floor()
-		xywh[2, sample, best, gy, gx] = torch.log(1e-8 + (boxes[:, 2] / anchors[best,0]))
-		xywh[3, sample, best, gy, gx] = torch.log(1e-8 + (boxes[:, 3] / anchors[best,1]))
-		tcls[sample, best, gy, gx, targets[sample, -1].long()] = 1.0
+		xywh[2, sample, best, gy, gx] = torch.log(1e-8 + (boxes[:, 2] / anchors[best, 0]))
+		xywh[3, sample, best, gy, gx] = torch.log(1e-8 + (boxes[:, 3] / anchors[best, 1]))
+		tcls[sample, best, gy, gx, targets[:, -1].long()] = 1.0
 		no_mask[sample, best, gy, gx] = False
 		mask[sample, best, gy, gx] = True
-		for index, item in enumerate(ious):
-			if any(item > CONFIG.confidence_thres):
-				no_mask[sample, index, gy, gx] = False
+		for idx, item in enumerate(ious.t()):
+			no_mask[sample[idx], item > CONFIG.confidence_thres, gy[idx], gx[idx]] = False
 		return mask, no_mask, xywh, tcls
 
 	def forward(self, outputs, targets):
-		self.metrics = self.__init_metrics.detach().clone()
+		self.metrics = torch.zeros(6, requires_grad=False)
 		for output, prediction, anchors in outputs:
 			mask, no_mask, txywh, classes = self.__build_targets(prediction.shape, anchors, targets)
 			self.metrics[0] += self.__mse(output[..., 0][mask], txywh[0][mask])
@@ -56,4 +54,4 @@ class YOLOv3Loss(torch.nn.Module):
 			noobj_loss = self.__bce(output[..., 4][no_mask], mask.float()[no_mask])
 			self.metrics[4] += (obj_loss + (100.0 * noobj_loss))
 			self.metrics[5] += self.__bce(output[..., 5:][mask], classes[mask])
-		return sum(self.metrics)
+		return self.metrics.sum()

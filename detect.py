@@ -32,9 +32,9 @@ def detect(model_path, images_dir) -> None:
 		outputs = model(tsfrm.ConvertImageDtype(torch.float32)(net_input_img).unsqueeze(0))
 		boxes = torch.cat([x[x[..., 4] > CONFIG.confidence_thres] for x in outputs], 0)
 		boxes[..., :4] = _box_cxcywh_to_xyxy(boxes[..., :4])
-		boxes[..., :4] = torchvision.ops.clip_boxes_to_image(boxes[..., :4], (CONFIG.img_dim, CONFIG.img_dim))
 		boxes = boxes[torchvision.ops.nms(boxes[..., :4], boxes[..., 4], CONFIG.nms_thres)]
 		boxes[..., :4] = box_resize(boxes[..., :4], (CONFIG.img_dim, CONFIG.img_dim), (img.size(-2), img.size(-1)))
+		boxes[..., :4] = torchvision.ops.clip_boxes_to_image(boxes[..., :4], (img.size(-2), img.size(-1)))
 		bbox_attrs = get_bbox_attributes(boxes)
 		img = torchvision.utils.draw_bounding_boxes(img, boxes[..., :4], labels=bbox_attrs[0], colors=bbox_attrs[1])
 		torchvision.utils.save_image(tsfrm.ConvertImageDtype(torch.float32)(img), f'{os.path.splitext(item)[0]}_pred.png')

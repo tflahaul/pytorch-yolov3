@@ -11,22 +11,21 @@ class ShortcutLayer(torch.nn.Module):
 		self.index = from_index
 
 class YoloDetectionLayer(torch.nn.Module):
-	def __init__(self, anchors, img_dim, classes, device) -> None:
+	def __init__(self, anchors, img_size, classes) -> None:
 		super(YoloDetectionLayer, self).__init__()
 		self.__bbox_attrs = (5 + classes) # (tx, ty, tw, th, obj, cls)
-		self.__anchors = torch.Tensor(anchors, device=device)
+		self.__anchors = torch.Tensor(anchors)
 		self.__nb_anchors = len(anchors)
-		self.__imsize = img_dim
-		self.__device = device
+		self.__imsize = img_size
 
-	def __grid_offsets(self, gs):
+	def __grid_offsets(self, gs : int):
 		x = torch.arange(gs, device=self.__device).repeat(gs, 1).view(1, 1, gs, gs)
 		y = torch.arange(gs, device=self.__device).repeat(gs, 1).t().view(1, 1, gs, gs)
 		return torch.stack((x, y), -1)
 
 	def forward(self, inputs):
-		samples, _, ny, nx = inputs.shape
-		stride = self.__imsize // ny
+		samples, _, y, x = inputs.shape
+		stride = self.__imsize // y
 		g = self.__imsize // stride
 		self.out = inputs.view(samples, self.__nb_anchors, g, g, self.__bbox_attrs)
 		self.scaled_anchors = self.__anchors.true_divide(stride)

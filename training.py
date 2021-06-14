@@ -18,7 +18,6 @@ class DetectionDataset(torch.utils.data.Dataset):
 		assert len(self.__X) == len(self.__y), f'got {len(self.__X)} imgs but {len(self.__y)} targets'
 		self.__transform = tsfrm.Compose([
 			tsfrm.Resize((CONFIG.img_dim, CONFIG.img_dim)),
-			tsfrm.RandomGrayscale(p=0.1),
 			tsfrm.ConvertImageDtype(torch.float32)])
 
 	def __getitem__(self, index : int):
@@ -26,22 +25,26 @@ class DetectionDataset(torch.utils.data.Dataset):
 		img = self.__transform(io.read_image(self.__X[index], io.image.ImageReadMode.RGB))
 		with open(self.__y[index], mode='r', newline='') as fd:
 			for ann in csv.reader(fd, quoting=csv.QUOTE_NONNUMERIC):
-				bbox = list([index] + ann[1:] + [CONFIG.labels.index(ann[0])])
-			bbox_attrs.append(torch.Tensor(bbox))
-		return img.to(CONFIG.device), torch.stack(bbox_attrs).to(CONFIG.device)
+				bbox = torch.Tensor([[index] + ann[1:] + [CONFIG.labels.index(ann[0])]])
+				bbox_attrs.append(bbox)
+		return img, torch.cat(bbox_attrs, 0)
 
 	def __len__(self) -> int:
 		return len(self.__X)
 
 def collate_batch_items(items : list):
-	return torch.stack((list(zip(*items)))[0]), torch.cat((list(zip(*items)))[1])
+	imgs = torch.stack((list(zip(*items)))[0]).to(CONFIG.device, non_blocking=True)
+	targets = torch.cat((list(zip(*items)))[1]).to(CONFIG.device)
+	targets[:, 0] = targets[:, 0] - targets[0, 0]
+	return imgs, targets
 
 def fit(model, dataset_dir : str) -> None:
 	dataset = torch.utils.data.DataLoader(
 		dataset=DetectionDataset(dataset_dir),
-		batch_size=CONFIG.batch_size,
+		batch_size=(CONFIG.batch_size//CONFIG.subdivisions),
 		collate_fn=collate_batch_items,
-		pin_memory=True)
+		pin_memory=True,
+		num_workers=4)
 	optimizer = torch.optim.AdamW(
 		params=model.parameters(),
 		weight_decay=CONFIG.decay,
@@ -50,17 +53,18 @@ def fit(model, dataset_dir : str) -> None:
 		optimizer=optimizer,
 		step_size=(CONFIG.epochs//3),
 		gamma=CONFIG.lr_decay)
-	criterion = YOLOv3Loss()
+	criterion = YOLOv3Loss().to(CONFIG.device)
 	model.train()
 	for epoch in range(CONFIG.epochs):
 		running_loss = 0.0
-		for images, targets in dataset:
-			optimizer.zero_grad() # dont accumulate gradients
+		for minibatch, (images, targets) in enumerate(dataset):
 			outputs = model(images)
 			loss = criterion(outputs, targets)
 			loss.backward()
-			optimizer.step()
 			running_loss += loss.item()
+			if (minibatch + 1) % CONFIG.subdivisions == 0:
+				optimizer.step()
+				optimizer.zero_grad()
 		print(f'epoch {(epoch + 1):>2d}/{CONFIG.epochs:>2d}, loss={running_loss:.6f}, {str(criterion)}')
 		scheduler.step()
 
@@ -77,8 +81,7 @@ def main() -> None:
 		print('Loading model, it might take some time...')
 		model = torch.load(arguments.load, map_location=CONFIG.device)
 	else:
-		model = Network()
-	model.to(CONFIG.device)
+		model = Network().to(CONFIG.device)
 	fit(model, arguments.dataset)
 	torch.save(model, f'pytorch-yolov3-v{CONFIG.version}.pth')
 
