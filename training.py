@@ -2,9 +2,9 @@ from yolov3.configuration import CONFIG
 from yolov3.yolo_loss import YOLOv3Loss
 from yolov3.network import Network
 from argparse import ArgumentParser
+from PIL import Image
 
 import torchvision.transforms as tsfrm
-import torchvision.io as io
 import torch
 import csv
 import os
@@ -18,11 +18,11 @@ class DetectionDataset(torch.utils.data.Dataset):
 		assert len(self.__X) == len(self.__y), f'got {len(self.__X)} imgs but {len(self.__y)} targets'
 		self.__transform = tsfrm.Compose([
 			tsfrm.Resize((CONFIG.img_dim, CONFIG.img_dim)),
-			tsfrm.ConvertImageDtype(torch.float32)])
+			tsfrm.ToTensor()])
 
 	def __getitem__(self, index : int):
 		bbox_attrs = list()
-		img = self.__transform(io.read_image(self.__X[index], io.image.ImageReadMode.RGB))
+		img = self.__transform(Image.open(self.__X[index]).convert('RGB'))
 		with open(self.__y[index], mode='r', newline='') as fd:
 			for ann in csv.reader(fd, quoting=csv.QUOTE_NONNUMERIC):
 				bbox = torch.Tensor([[index] + ann[1:] + [CONFIG.labels.index(ann[0])]])

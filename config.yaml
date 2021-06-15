@@ -6,7 +6,7 @@ device: 'cpu'
 version: 0.1
 
 ## Training hyper-parameters
-epochs: 80
+epochs: 10 # tbd
 batch_size: 64
 subdivisions: 16
 learning_rate: 0.001

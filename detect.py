@@ -1,9 +1,9 @@
 from torchvision.ops._box_convert import _box_cxcywh_to_xyxy
 from yolov3.configuration import CONFIG
 from argparse import ArgumentParser
+from PIL import Image
 
 import torchvision.transforms as tsfrm
-import torchvision.io as io
 import torchvision
 import torch
 import os
@@ -11,8 +11,8 @@ import os
 def get_bbox_attributes(boxes) -> list:
 	available_colors = list(['red', 'blue', 'green'])
 	attributes = list()
-	for index in torch.argmax(boxes[...,5:], -1):
-		attributes.append((CONFIG.labels[index], available_colors[index]))
+	for index in torch.argmax(boxes[..., 5:], -1):
+		attributes.append((CONFIG.labels[0], available_colors[0]))
 	return list(zip(*attributes))
 
 def box_resize(boxes, in_shape, out_shape):
@@ -27,17 +27,20 @@ def detect(model_path, images_dir) -> None:
 	model = torch.load(model_path, map_location=CONFIG.device)
 	model.eval() # set bn layers to evaluation mode
 	for item in dataset:
-		img = io.read_image(os.path.join(images_dir, item), io.image.ImageReadMode.RGB).to(CONFIG.device)
-		net_input_img = tsfrm.Resize((CONFIG.img_dim, CONFIG.img_dim))(img)
-		outputs = model(tsfrm.ConvertImageDtype(torch.float32)(net_input_img).unsqueeze(0))
+		img = tsfrm.ToTensor()(Image.open(os.path.join(images_dir, item)).convert('RGB')).to(CONFIG.device)
+		outputs = model(tsfrm.Resize((CONFIG.img_dim, CONFIG.img_dim))(img).unsqueeze(0))
 		boxes = torch.cat([x[x[..., 4] > CONFIG.confidence_thres] for x in outputs], 0)
 		boxes[..., :4] = _box_cxcywh_to_xyxy(boxes[..., :4])
 		boxes = boxes[torchvision.ops.nms(boxes[..., :4], boxes[..., 4], CONFIG.nms_thres)]
 		boxes[..., :4] = box_resize(boxes[..., :4], (CONFIG.img_dim, CONFIG.img_dim), (img.size(-2), img.size(-1)))
 		boxes[..., :4] = torchvision.ops.clip_boxes_to_image(boxes[..., :4], (img.size(-2), img.size(-1)))
 		bbox_attrs = get_bbox_attributes(boxes)
-		img = torchvision.utils.draw_bounding_boxes(img, boxes[..., :4], labels=bbox_attrs[0], colors=bbox_attrs[1])
-		torchvision.utils.save_image(tsfrm.ConvertImageDtype(torch.float32)(img), f'{os.path.splitext(item)[0]}_pred.png')
+		img = torchvision.utils.draw_bounding_boxes(
+			image=tsfrm.ConvertImageDtype(torch.uint8)(img),
+			boxes=boxes[..., :4],
+			labels=bbox_attrs[0],
+			colors=bbox_attrs[1])
+		torchvision.utils.save_image(tsfrm.ConvertImageDtype(torch.float)(img), f'{os.path.splitext(item)[0]}_pred.png')
 		print(f'Created {os.path.splitext(item)[0]}_pred.png')
 
 def main() -> None:

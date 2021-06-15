@@ -1,3 +1,4 @@
+import functools
 import torch
 
 class RouteLayer(torch.nn.Module):
@@ -18,10 +19,10 @@ class YoloDetectionLayer(torch.nn.Module):
 		self.__nb_anchors = len(anchors)
 		self.__imsize = img_size
 
-	def __grid_offsets(self, gs : int):
-		x = torch.arange(gs, device=self.__device).repeat(gs, 1).view(1, 1, gs, gs)
-		y = torch.arange(gs, device=self.__device).repeat(gs, 1).t().view(1, 1, gs, gs)
-		return torch.stack((x, y), -1)
+	@functools.cache
+	def __grid_offsets(self, size : int):
+		grid = torch.arange(size).repeat(size, 1)
+		return torch.stack((grid, grid.t()), -1).view(1, 1, size, size, 2)
 
 	def forward(self, inputs):
 		samples, _, y, x = inputs.shape
