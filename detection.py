@@ -12,7 +12,7 @@ def get_bbox_attributes(boxes) -> list:
 	available_colors = list(['red', 'blue', 'green'])
 	attributes = list()
 	for index in torch.argmax(boxes[..., 5:], -1):
-		attributes.append((CONFIG.labels[0], available_colors[0]))
+		attributes.append((CONFIG.labels[index], available_colors[index]))
 	return list(zip(*attributes))
 
 def box_resize(boxes, in_shape, out_shape):

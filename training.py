@@ -77,13 +77,12 @@ def main() -> None:
 	arguments = parser.parse_args()
 	if arguments.enable_cuda and torch.cuda.is_available():
 		setattr(CONFIG, 'device', torch.device('cuda:' + str(arguments.gpu)))
+	model = Network().to(CONFIG.device)
 	if arguments.load and os.path.exists(arguments.load):
 		print('Loading model, it might take some time...')
-		model = torch.load(arguments.load, map_location=CONFIG.device)
-	else:
-		model = Network().to(CONFIG.device)
+		model.load_state_dict(torch.load(arguments.load))
 	fit(model, arguments.dataset)
-	torch.save(model, f'pytorch-yolov3-v{CONFIG.version}.pth')
+	torch.save(model.state_dict(), f'pytorch-yolov3-v{CONFIG.version}.pth')
 
 if __name__ == '__main__':
 	main()
