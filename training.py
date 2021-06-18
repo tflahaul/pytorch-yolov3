@@ -18,6 +18,7 @@ class DetectionDataset(torch.utils.data.Dataset):
 		assert len(self.__X) == len(self.__y), f'got {len(self.__X)} imgs but {len(self.__y)} targets'
 		self.__transform = tsfrm.Compose([
 			tsfrm.Resize((CONFIG.img_dim, CONFIG.img_dim)),
+			tsfrm.ColorJitter(brightness=1.5, saturation=1.5, hue=0.1),
 			tsfrm.ToTensor()])
 
 	def __getitem__(self, index : int):
@@ -60,8 +61,8 @@ def fit(model, dataset_dir : str) -> None:
 		for minibatch, (images, targets) in enumerate(dataset):
 			outputs = model(images)
 			loss = criterion(outputs, targets)
-			loss.backward()
 			running_loss += loss.item()
+			loss.backward()
 			if (minibatch + 1) % CONFIG.subdivisions == 0:
 				optimizer.step()
 				optimizer.zero_grad()
@@ -75,12 +76,12 @@ def main() -> None:
 	parser.add_argument('--gpu', type=int, default=0, help='GPU index')
 	parser.add_argument('--enable-cuda', action='store_true', help='enable CUDA')
 	arguments = parser.parse_args()
-	if arguments.enable_cuda and torch.cuda.is_available():
+	if arguments.enable_cuda and torch.cuda.is_available() == True:
 		setattr(CONFIG, 'device', torch.device('cuda:' + str(arguments.gpu)))
 	model = Network().to(CONFIG.device)
-	if arguments.load and os.path.exists(arguments.load):
-		print('Loading model, it might take some time...')
-		model.load_state_dict(torch.load(arguments.load))
+	if arguments.load and os.path.exists(arguments.load) == True:
+		print('Loading model, this might take some time...')
+		model.load_state_dict(torch.load(arguments.load, map_location=CONFIG.device))
 	fit(model, arguments.dataset)
 	torch.save(model.state_dict(), f'pytorch-yolov3-v{CONFIG.version}.pth')
 

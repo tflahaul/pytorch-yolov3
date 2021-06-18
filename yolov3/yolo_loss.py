@@ -22,10 +22,10 @@ class YOLOv3Loss(torch.nn.Module):
 	@torch.no_grad()
 	def __build_targets(self, output_shape, anchors, targets):
 		b, a, g, g, _ = output_shape # batch, anchors, grid size
-		no_mask = torch.full((b, a, g, g), True, dtype=torch.bool)
-		mask = torch.full((b, a, g, g), False, dtype=torch.bool)
-		tcls = torch.zeros(b, a, g, g, CONFIG.classes)
-		xywh = torch.zeros(4, b, a, g, g)
+		no_mask = torch.ones((b, a, g, g), dtype=torch.bool)
+		mask = torch.zeros((b, a, g, g), dtype=torch.bool)
+		tcls = torch.zeros((b, a, g, g, CONFIG.classes))
+		xywh = torch.zeros((4, b, a, g, g))
 		sample = targets[:, 0].long()
 		boxes = _box_xyxy_to_cxcywh(targets[:, 1:5]) * g
 		gx, gy = boxes[:, :2].t().long()
