@@ -32,7 +32,7 @@ Other arguments include `enable-cuda` to enable GPU acceleration on CUDA-capable
 Here is an example :
 
 ```python
-from detection import detect_single_image
+from detection import detect_from_single_image
 from PIL import Image
 
 import torchvision.transforms as tsfrm
@@ -40,7 +40,7 @@ import torchvision.utils as utils
 
 model = torch.load('pytorch-entire-yolov3.pth')
 img = tsfrm.ToTensor()(Image.open('nude.png').convert('RGB'))
-boxes = detect_single_image(model, img)
+boxes = detect_from_single_image(model, img)
 img = utils.draw_bounding_boxes(tsfrm.ConvertImageDtype(torch.uint8)(img), boxes[...,:4])
 utils.save_image(tsfrm.ConvertImageDtype(torch.float32)(img), 'nude_pred.png')
 ```

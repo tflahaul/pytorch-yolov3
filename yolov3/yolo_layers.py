@@ -28,7 +28,7 @@ class YoloDetectionLayer(torch.nn.Module):
 		samples, _, y, x = inputs.shape
 		stride = self.__imsize // y
 		g = self.__imsize // stride
-		self.out = inputs.view(samples, self.__nb_anchors, g, g, self.__bbox_attrs)
+		self.out = inputs.view(samples, self.__nb_anchors, self.__bbox_attrs, y, x).permute(0, 1, 3, 4, 2)
 		self.scaled_anchors = self.__anchors.true_divide(stride)
 		self.out[..., :2] = torch.sigmoid(self.out[..., :2])
 		self.out[..., 4:] = torch.sigmoid(self.out[..., 4:])
