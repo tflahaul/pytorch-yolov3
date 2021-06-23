@@ -13,11 +13,11 @@ def convolutional(item, out_filters):
 		stride=item.get('stride'),
 		padding=((item.get('size', 1) - 1)//2),
 		bias=(not item.get('batch_normalize'))))
-	if item.get('batch_normalize', False) == True:
+	if item.get('batch_normalize') == True:
 		x.add_module('bn', torch.nn.BatchNorm2d(
 			num_features=item.get('filters'),
 			momentum=CONFIG.bn_momentum))
-	if item.get('activation', 'linear') == 'leaky':
+	if item.get('activation') == 'leaky':
 		x.add_module('act', torch.nn.LeakyReLU(0.1))
 	out_filters.append(item.get('filters'))
 	return x

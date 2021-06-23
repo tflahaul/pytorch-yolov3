@@ -2,12 +2,12 @@ import functools
 import torch
 
 class RouteLayer(torch.nn.Module):
-	def __init__(self, layers : list) -> None:
+	def __init__(self, layers: list) -> None:
 		super(RouteLayer, self).__init__()
 		self.indexes = layers
 
 class ShortcutLayer(torch.nn.Module):
-	def __init__(self, from_index : int) -> None:
+	def __init__(self, from_index: int) -> None:
 		super(ShortcutLayer, self).__init__()
 		self.index = from_index
 
@@ -20,7 +20,7 @@ class YoloDetectionLayer(torch.nn.Module):
 		self.__imsize = img_size
 
 	@functools.cache
-	def __grid_offsets(self, size : int):
+	def __grid_offsets(self, size: int):
 		grid = torch.arange(size).repeat(size, 1)
 		return torch.stack((grid, grid.t()), -1).view(1, 1, size, size, 2)
 

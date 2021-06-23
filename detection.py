@@ -34,7 +34,7 @@ def detect_from_single_image(
 		nms_thres (float): iou threshold used for non-maximum suppression
 
 	Returns:
-		Tensor[N, 85]: boxes
+		Tensor[N, 85]: predicted boxes
 	"""
 	model.eval() # set bn layers to evaluation mode
 	out = model(__transformations(image).unsqueeze(0))
@@ -42,7 +42,7 @@ def detect_from_single_image(
 	if boxes.size(0) > 0:
 		boxes = boxes[torchvision.ops.nms(boxes[..., :4], boxes[..., 4], nms_thres)]
 		boxes[..., :4] = _box_cxcywh_to_xyxy(boxes[..., :4])
-		boxes[..., :4] = _box_resize(boxes[..., :4], (IMG_SIZE, IMG_SIZE), (image.size(-2), image.size(-1)))
+		boxes[..., :4] = _box_resize(boxes[..., :4], (IMG_SIZE, IMG_SIZE), image.shape[-2:])
 	return boxes
 
 @torch.no_grad()
@@ -60,5 +60,7 @@ def detect_from_video_stream(
 		stream (): stream of images of shape (3, H, W)
 		conf_thres (float): objectness confidence threshold
 		nms_thres (float): iou threshold used for non-maximum suppression
+
+	Returns:
 	"""
 	model.eval() # set bn layers to evaluation mode

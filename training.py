@@ -10,7 +10,7 @@ import csv
 import os
 
 class DetectionDataset(torch.utils.data.Dataset):
-	def __init__(self, dataset_dir : str) -> None:
+	def __init__(self, dataset_dir: str) -> None:
 		super(DetectionDataset, self).__init__()
 		dirs = sorted([d.path for d in os.scandir(dataset_dir) if d.is_dir()])
 		self.__X = sorted([os.path.join(dirs[0], item) for item in os.listdir(dirs[0])])
@@ -21,7 +21,7 @@ class DetectionDataset(torch.utils.data.Dataset):
 			tsfrm.ColorJitter(brightness=1.5, saturation=1.5, hue=0.1),
 			tsfrm.ToTensor()])
 
-	def __getitem__(self, index : int):
+	def __getitem__(self, index: int):
 		bbox_attrs = list()
 		img = self.__transform(Image.open(self.__X[index]).convert('RGB'))
 		with open(self.__y[index], mode='r', newline='') as fd:
@@ -33,13 +33,13 @@ class DetectionDataset(torch.utils.data.Dataset):
 	def __len__(self) -> int:
 		return len(self.__X)
 
-def collate_batch_items(items : list):
+def collate_batch_items(items: list):
 	imgs = torch.stack((list(zip(*items)))[0]).to(CONFIG.device, non_blocking=True)
 	targets = torch.cat((list(zip(*items)))[1]).to(CONFIG.device)
 	targets[:, 0] = targets[:, 0] - targets[0, 0]
 	return imgs, targets
 
-def fit(model, dataset_dir : str) -> None:
+def fit(model, dataset_dir: str) -> None:
 	dataset = torch.utils.data.DataLoader(
 		dataset=DetectionDataset(dataset_dir),
 		batch_size=(CONFIG.batch_size//CONFIG.subdivisions),
