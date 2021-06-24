@@ -36,6 +36,6 @@ class YoloDetectionLayer(torch.nn.Module):
 		self.pred[..., :2] = self.pred[..., :2] + self.__grid_offsets(g)
 		self.pred[..., 2:4] = self.pred[..., 2:4].exp() * self.scaled_anchors.view(1, -1, 1, 1, 2)
 		if not self.training:
-			self.out = self.pred.view(samples, -1, self.__bbox_attrs)
+			self.out = self.pred.reshape(samples, -1, self.__bbox_attrs)
 			self.out[..., :4].mul_(stride)
 		return self.out
