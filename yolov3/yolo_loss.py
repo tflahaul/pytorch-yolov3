@@ -45,6 +45,8 @@ class YOLOv3Loss(torch.nn.Module):
 	def forward(self, outputs, targets):
 		self.metrics = torch.zeros(6, requires_grad=False)
 		for output, prediction, anchors in outputs:
+			output = output.cpu()
+			prediction = prediction.cpu()
 			mask, no_mask, txywh, classes = self.__build_targets(prediction.shape, anchors, targets)
 			self.metrics[0] += self.__mse(output[..., 0][mask], txywh[0][mask])
 			self.metrics[1] += self.__mse(output[..., 1][mask], txywh[1][mask])

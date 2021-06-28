@@ -34,9 +34,9 @@ class DetectionDataset(torch.utils.data.Dataset):
 		return len(self.__X)
 
 def collate_batch_items(items: list):
-	imgs = torch.stack((list(zip(*items)))[0]).to(CONFIG.device, non_blocking=True)
-	targets = torch.cat((list(zip(*items)))[1]).to(CONFIG.device)
-	targets[:, 0] = targets[:, 0] - targets[0, 0]
+	imgs = torch.stack((list(zip(*items)))[0])
+	targets = torch.cat((list(zip(*items)))[1])
+	targets[:, 0] = targets[:, 0] - targets[0, 0] # indices starts at 0
 	return imgs, targets
 
 def fit(model, dataset_dir: str) -> None:
@@ -54,12 +54,12 @@ def fit(model, dataset_dir: str) -> None:
 		optimizer=optimizer,
 		step_size=(CONFIG.epochs//3),
 		gamma=CONFIG.lr_decay)
-	criterion = YOLOv3Loss().to(CONFIG.device)
+	criterion = YOLOv3Loss()
 	model.train()
 	for epoch in range(CONFIG.epochs):
 		running_loss = 0.0
 		for minibatch, (images, targets) in enumerate(dataset):
-			outputs = model(images)
+			outputs = model(images.to(CONFIG.device, non_blocking=True))
 			loss = criterion(outputs, targets)
 			running_loss += loss.item()
 			loss.backward()
@@ -82,6 +82,7 @@ def main() -> None:
 	if arguments.load and os.path.exists(arguments.load) == True:
 		print('Loading model, this might take some time...')
 		model.load_state_dict(torch.load(arguments.load, map_location=CONFIG.device))
+	torch.multiprocessing.set_start_method('spawn')
 	fit(model, arguments.dataset)
 	torch.save(model.state_dict(), f'pytorch-yolov3-v{CONFIG.version}.pth')
 

@@ -33,8 +33,8 @@ class YoloDetectionLayer(torch.nn.Module):
 		self.out[..., :2] = torch.sigmoid(self.out[..., :2])
 		self.out[..., 4:] = torch.sigmoid(self.out[..., 4:])
 		self.pred = self.out.detach().clone()
-		self.pred[..., :2] = self.pred[..., :2] + self.__grid_offsets(g)
-		self.pred[..., 2:4] = self.pred[..., 2:4].exp() * self.scaled_anchors.view(1, -1, 1, 1, 2)
+		self.pred[..., :2] = self.pred[..., :2] + self.__grid_offsets(g).to(inputs.device)
+		self.pred[..., 2:4] = self.pred[..., 2:4].exp() * self.scaled_anchors.view(1, -1, 1, 1, 2).to(inputs.device)
 		if not self.training:
 			self.out = self.pred.reshape(samples, -1, self.__bbox_attrs)
 			self.out[..., :4].mul_(stride)
