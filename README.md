@@ -14,7 +14,7 @@ Install the dependencies `python -m pip install -r requirements.txt`
 
 <br/>
 
-`training.py` is the training script. It outputs a `.pth` file of roughly 250Mb that contains the weights for the model parameters.<br/>
+`training.py` is the training script. It outputs a `.pth` file of roughly 240Mb that contains the weights for the model parameters.<br/>
 This script can take multiple arguments but `dataset` is the only mandatory one. It is the path to your dataset folder, which should have the following architecture :
 
 ```bash
@@ -44,4 +44,3 @@ boxes = detect_from_single_image(model, img)
 img = utils.draw_bounding_boxes(tsfrm.ConvertImageDtype(torch.uint8)(img), boxes[...,:4])
 utils.save_image(tsfrm.ConvertImageDtype(torch.float32)(img), 'nude_pred.png')
 ```
-

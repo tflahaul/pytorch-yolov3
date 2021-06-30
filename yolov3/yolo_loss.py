@@ -10,9 +10,9 @@ class YOLOv3Loss(torch.nn.Module):
 		self.__bce = torch.nn.BCELoss()
 
 	def __str__(self):
-		return (f'x={self.metrics[0]:.2f}, y={self.metrics[1]:.2f}, '
-			f'w={self.metrics[2]:.2f}, h={self.metrics[3]:.2f}, '
-			f'obj={self.metrics[4]:.2f}, cls={self.metrics[5]:.2f}')
+		return (f'x={self.metrics[0]:.4f}, y={self.metrics[1]:.4f}, '
+			f'w={self.metrics[2]:.4f}, h={self.metrics[3]:.4f}, '
+			f'obj={self.metrics[4]:.4f}, cls={self.metrics[5]:.4f}')
 
 	def __anchors_iou(self, anchor, boxes):
 		inter = torch.min(anchor[0], boxes[:, 0]) * torch.min(anchor[1], boxes[:, 1])
@@ -46,8 +46,7 @@ class YOLOv3Loss(torch.nn.Module):
 		self.metrics = torch.zeros(6, requires_grad=False)
 		for output, prediction, anchors in outputs:
 			output = output.cpu()
-			prediction = prediction.cpu()
-			mask, no_mask, txywh, classes = self.__build_targets(prediction.shape, anchors, targets)
+			mask, no_mask, txywh, classes = self.__build_targets(prediction.cpu().shape, anchors.cpu(), targets)
 			self.metrics[0] += self.__mse(output[..., 0][mask], txywh[0][mask])
 			self.metrics[1] += self.__mse(output[..., 1][mask], txywh[1][mask])
 			self.metrics[2] += self.__mse(output[..., 2][mask], txywh[2][mask])

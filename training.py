@@ -39,7 +39,7 @@ def collate_batch_items(items: list):
 	targets[:, 0] = targets[:, 0] - targets[0, 0] # indices starts at 0
 	return imgs, targets
 
-def fit(model, dataset_dir: str) -> None:
+def fit(model, dataset_dir: str, start: int = 0) -> None:
 	dataset = torch.utils.data.DataLoader(
 		dataset=DetectionDataset(dataset_dir),
 		batch_size=(CONFIG.batch_size//CONFIG.subdivisions),
@@ -56,7 +56,7 @@ def fit(model, dataset_dir: str) -> None:
 		gamma=CONFIG.lr_decay)
 	criterion = YOLOv3Loss()
 	model.train()
-	for epoch in range(CONFIG.epochs):
+	for epoch in range(start, CONFIG.epochs):
 		running_loss = 0.0
 		for minibatch, (images, targets) in enumerate(dataset):
 			outputs = model(images.to(CONFIG.device, non_blocking=True))
@@ -72,6 +72,7 @@ def fit(model, dataset_dir: str) -> None:
 def main() -> None:
 	parser = ArgumentParser(description='YOLOv3 training script')
 	parser.add_argument('dataset', type=str, help='dataset folder')
+	parser.add_argument('--start', type=int, default=0, help='start iteration')
 	parser.add_argument('--load', type=str, metavar='MODEL', help='loads model')
 	parser.add_argument('--gpu', type=int, default=0, help='GPU index')
 	parser.add_argument('--enable-cuda', action='store_true', help='enable CUDA')
@@ -83,7 +84,7 @@ def main() -> None:
 		print('Loading model, this might take some time...')
 		model.load_state_dict(torch.load(arguments.load, map_location=CONFIG.device))
 	torch.multiprocessing.set_start_method('spawn')
-	fit(model, arguments.dataset)
+	fit(model, arguments.dataset, arguments.start)
 	torch.save(model.state_dict(), f'pytorch-yolov3-v{CONFIG.version}.pth')
 
 if __name__ == '__main__':

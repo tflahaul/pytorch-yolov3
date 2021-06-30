@@ -40,8 +40,8 @@ def detect_from_single_image(
 	out = model(__transformations(image).unsqueeze(0))
 	boxes = torch.cat([x[x[..., 4] > conf_thres] for x in out], 0).to(image.device)
 	if boxes.size(0) > 0:
-		boxes = boxes[torchvision.ops.nms(boxes[..., :4], boxes[..., 4], nms_thres)]
 		boxes[..., :4] = _box_cxcywh_to_xyxy(boxes[..., :4])
+		boxes = boxes[torchvision.ops.nms(boxes[..., :4], boxes[..., 4], nms_thres)]
 		boxes[..., :4] = _box_resize(boxes[..., :4], (IMG_SIZE, IMG_SIZE), image.shape[-2:])
 	return boxes
 

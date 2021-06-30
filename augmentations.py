@@ -1,8 +1,8 @@
 import torch
 
-class HorizontalFlipWithTargets(torch.nn.Module):
+class RandomHorizontalFlipWithTargets(torch.nn.Module):
 	def __init__(self, p: float = 0.5) -> None:
-		super(HorizontalFlipWithTargets, self).__init__()
+		super(RandomHorizontalFlipWithTargets, self).__init__()
 		self.p = p
 
 	def forward(self, image: torch.Tensor, targets: torch.Tensor):
