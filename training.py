@@ -39,21 +39,21 @@ def collate_batch_items(items: list):
 	targets[:, 0] = targets[:, 0] - targets[0, 0] # indices starts at 0
 	return imgs, targets
 
-def fit(model, dataset_dir: str, start: int = 0) -> None:
+def save_checkpoint(model, optimizer, scheduler, epoch) -> None:
+	checkpoint = dict({
+		'model': model.state_dict(),
+		'optimizer': optimizer.state_dict(),
+		'scheduler': scheduler.state_dict(),
+		'epoch': epoch})
+	torch.save(checkpoint, f'yolov3-chkpt-{epoch}.pth')
+
+def fit(model, optimizer, scheduler, dataset_dir: str, start: int = 0) -> None:
 	dataset = torch.utils.data.DataLoader(
 		dataset=DetectionDataset(dataset_dir),
 		batch_size=(CONFIG.batch_size//CONFIG.subdivisions),
 		collate_fn=collate_batch_items,
 		pin_memory=True,
 		num_workers=4)
-	optimizer = torch.optim.AdamW(
-		params=model.parameters(),
-		weight_decay=CONFIG.decay,
-		lr=CONFIG.learning_rate)
-	scheduler = torch.optim.lr_scheduler.StepLR(
-		optimizer=optimizer,
-		step_size=(CONFIG.epochs//3),
-		gamma=CONFIG.lr_decay)
 	criterion = YOLOv3Loss()
 	model.train()
 	for epoch in range(start, CONFIG.epochs):
@@ -66,25 +66,38 @@ def fit(model, dataset_dir: str, start: int = 0) -> None:
 			if (minibatch + 1) % CONFIG.subdivisions == 0:
 				optimizer.step()
 				optimizer.zero_grad()
-		print(f'epoch {(epoch + 1):>2d}/{CONFIG.epochs:>2d}, loss={running_loss:.6f}, {str(criterion)}')
 		scheduler.step()
+		print(f'epoch {(epoch + 1):>3d}/{CONFIG.epochs:<3d}, loss={running_loss:.6f}, {str(criterion)}')
+		save_checkpoint(model, optimizer, scheduler, epoch + 1)
 
 def main() -> None:
 	parser = ArgumentParser(description='YOLOv3 training script')
 	parser.add_argument('dataset', type=str, help='dataset folder')
-	parser.add_argument('--start', type=int, default=0, help='start iteration')
-	parser.add_argument('--load', type=str, metavar='MODEL', help='loads model')
+	parser.add_argument('--resume', type=str, metavar='checkpoint', help='resume from checkpoint')
 	parser.add_argument('--gpu', type=int, default=0, help='GPU index')
 	parser.add_argument('--enable-cuda', action='store_true', help='enable CUDA')
 	arguments = parser.parse_args()
 	if arguments.enable_cuda and torch.cuda.is_available() == True:
 		setattr(CONFIG, 'device', torch.device('cuda:' + str(arguments.gpu)))
 	model = Network().to(CONFIG.device)
-	if arguments.load and os.path.exists(arguments.load) == True:
-		print('Loading model, this might take some time...')
-		model.load_state_dict(torch.load(arguments.load, map_location=CONFIG.device))
+	optimizer = torch.optim.AdamW(
+		params=model.parameters(),
+		weight_decay=CONFIG.decay,
+		lr=CONFIG.learning_rate)
+	scheduler = torch.optim.lr_scheduler.StepLR(
+		optimizer=optimizer,
+		step_size=(CONFIG.epochs//3),
+		gamma=CONFIG.lr_decay)
+	start_iteration = 0
+	if arguments.resume and os.path.exists(arguments.resume) == True:
+		print(f'Loading checkpoint `{arguments.resume}`, this might take some time...')
+		checkpoint = torch.load(arguments.resume, map_location=CONFIG.device)
+		model.load_state_dict(checkpoint.get('model'))
+		optimizer.load_state_dict(checkpoint.get('optimizer'))
+		scheduler.load_state_dict(checkpoint.get('scheduler'))
+		start_iteration = checkpoint.get('epoch')
 	torch.multiprocessing.set_start_method('spawn')
-	fit(model, arguments.dataset, arguments.start)
+	fit(model, optimizer, scheduler, arguments.dataset, start_iteration)
 	torch.save(model.state_dict(), f'pytorch-yolov3-v{CONFIG.version}.pth')
 
 if __name__ == '__main__':
