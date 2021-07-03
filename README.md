@@ -3,7 +3,7 @@ Yet another PyTorch implementation of YOLOv3 (https://pjreddie.com/darknet/yolo/
 
 ### Installation
 Clone the repository using `git clone https://github.com/tflahaul/pytorch-yolov3`<br/>
-Create a new virtual environment with `python -m venv ENV_NAME`<br/>
+If needed, create a new virtual environment with `python -m venv ENV_NAME`<br/>
 Activate the environment `source ENV_NAME/bin/activate`<br/>
 Install the dependencies `python -m pip install -r requirements.txt`
 
@@ -15,21 +15,27 @@ Install the dependencies `python -m pip install -r requirements.txt`
 <br/>
 
 `training.py` is the training script. It outputs a `.pth` file of roughly 240Mb that contains the weights for the model parameters.<br/>
-This script can take multiple arguments but `dataset` is the only mandatory one. It is the path to your dataset folder, which should have the following architecture :
-
+This script can take multiple arguments but `dataset` is the only mandatory one. It is the path to your dataset folder, which should have an architecture similar to this one:
 ```bash
 dataset
-dataset/images/
-dataset/targets/
+dataset/images/img.png
+dataset/targets/img.csv
 ```
 
-Other arguments include `enable-cuda` to enable GPU acceleration on CUDA-capable devices and `load` to train an already trained model (transfer learning).
+The targets must be CSV files formatted as such:
+```csv
+"label_0",x1,y1,x2,y2
+"label_1",x1,y1,x2,y2
+```
+`x1,y1` being the coordinates of the bounding box' upper left corner and `x2,y2` the lower right.<br/>
+
+Other arguments include `enable-cuda` to enable GPU acceleration on CUDA-capable devices (single GPU only, multi-GPU training isn't supported yet) and `resume` to resume training from a checkpoint.
 
 <br/>
 
 `detection.py` isn't an actual program but was designed more like an API to simplify your detection scripts. You have to import it in your code like a module and you'll be able to use the functions like any regular API.<br/>
 
-Here is an example :
+Here is an example (w/ torchvision==0.9.0):
 
 ```python
 from detection import detect_from_single_image
@@ -38,9 +44,11 @@ from PIL import Image
 import torchvision.transforms as tsfrm
 import torchvision.utils as utils
 
-model = torch.load('pytorch-entire-yolov3.pth')
+model = torch.load('pytorch-yolov3.pth')
 img = tsfrm.ToTensor()(Image.open('nude.png').convert('RGB'))
 boxes = detect_from_single_image(model, img)
-img = utils.draw_bounding_boxes(tsfrm.ConvertImageDtype(torch.uint8)(img), boxes[...,:4])
-utils.save_image(tsfrm.ConvertImageDtype(torch.float32)(img), 'nude_pred.png')
+img = tsfrm.ConvertImageDtype(torch.uint8)(img)
+img = utils.draw_bounding_boxes(img, boxes[...,:4])
+img = tsfrm.ConvertImageDtype(torch.float32)(img)
+utils.save_image(img, 'nude_pred.png')
 ```

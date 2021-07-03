@@ -1,3 +1,4 @@
+from augmentations import RandomHorizontalFlip
 from yolov3.configuration import CONFIG
 from yolov3.yolo_loss import YOLOv3Loss
 from yolov3.network import Network
@@ -16,14 +17,14 @@ class DetectionDataset(torch.utils.data.Dataset):
 		self.__X = sorted([os.path.join(dirs[0], item) for item in os.listdir(dirs[0])])
 		self.__y = sorted([os.path.join(dirs[1], item) for item in os.listdir(dirs[1])])
 		assert len(self.__X) == len(self.__y), f'got {len(self.__X)} imgs but {len(self.__y)} targets'
-		self.__transform = tsfrm.Compose([
+		self.__transforms = tsfrm.Compose([
 			tsfrm.Resize((CONFIG.img_dim, CONFIG.img_dim)),
 			tsfrm.ColorJitter(brightness=1.5, saturation=1.5, hue=0.1),
 			tsfrm.ToTensor()])
 
 	def __getitem__(self, index: int):
 		bbox_attrs = list()
-		img = self.__transform(Image.open(self.__X[index]).convert('RGB'))
+		img = self.__transforms(Image.open(self.__X[index]).convert('RGB'))
 		with open(self.__y[index], mode='r', newline='') as fd:
 			for ann in csv.reader(fd, quoting=csv.QUOTE_NONNUMERIC):
 				bbox = torch.Tensor([[index] + ann[1:] + [CONFIG.labels.index(ann[0])]])
@@ -50,7 +51,7 @@ def save_checkpoint(model, optimizer, scheduler, epoch) -> None:
 def fit(model, optimizer, scheduler, dataset_dir: str, start: int = 0) -> None:
 	dataset = torch.utils.data.DataLoader(
 		dataset=DetectionDataset(dataset_dir),
-		batch_size=(CONFIG.batch_size//CONFIG.subdivisions),
+		batch_size=(CONFIG.batch_size // CONFIG.subdivisions),
 		collate_fn=collate_batch_items,
 		pin_memory=True,
 		num_workers=4)
@@ -74,8 +75,8 @@ def main() -> None:
 	parser = ArgumentParser(description='YOLOv3 training script')
 	parser.add_argument('dataset', type=str, help='dataset folder')
 	parser.add_argument('--resume', type=str, metavar='checkpoint', help='resume from checkpoint')
-	parser.add_argument('--gpu', type=int, default=0, help='GPU index')
 	parser.add_argument('--enable-cuda', action='store_true', help='enable CUDA')
+	parser.add_argument('--gpu', type=int, default=0, help='GPU index')
 	arguments = parser.parse_args()
 	if arguments.enable_cuda and torch.cuda.is_available() == True:
 		setattr(CONFIG, 'device', torch.device('cuda:' + str(arguments.gpu)))
@@ -86,7 +87,7 @@ def main() -> None:
 		lr=CONFIG.learning_rate)
 	scheduler = torch.optim.lr_scheduler.StepLR(
 		optimizer=optimizer,
-		step_size=(CONFIG.epochs//3),
+		step_size=(CONFIG.epochs // 3),
 		gamma=CONFIG.lr_decay)
 	start_iteration = 0
 	if arguments.resume and os.path.exists(arguments.resume) == True:
