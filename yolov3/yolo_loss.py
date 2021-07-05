@@ -22,8 +22,8 @@ class YOLOv3Loss(torch.nn.Module):
 	@torch.no_grad()
 	def __build_targets(self, output_shape, anchors, targets):
 		b, a, g, g, _ = output_shape # batch, anchors, grid size
-		no_mask = torch.ones((b, a, g, g), dtype=torch.int64)
-		mask = torch.zeros((b, a, g, g), dtype=torch.int64)
+		no_mask = torch.ones((b, a, g, g), dtype=torch.bool)
+		mask = torch.zeros((b, a, g, g), dtype=torch.bool)
 		tcls = torch.zeros((b, a, g, g, CONFIG.classes))
 		xywh = torch.zeros((4, b, a, g, g))
 		sample = targets[:, 0].long()
@@ -36,10 +36,10 @@ class YOLOv3Loss(torch.nn.Module):
 		xywh[2, sample, best, gy, gx] = torch.log(1e-8 + (boxes[:, 2] / anchors[best, 0]))
 		xywh[3, sample, best, gy, gx] = torch.log(1e-8 + (boxes[:, 3] / anchors[best, 1]))
 		tcls[sample, best, gy, gx, targets[:, -1].long()] = 1.0
-		no_mask[sample, best, gy, gx] = 0.0
-		mask[sample, best, gy, gx] = 1.0
+		no_mask[sample, best, gy, gx] = False
+		mask[sample, best, gy, gx] = True
 		for idx, item in enumerate(ious.t()):
-			no_mask[sample[idx], item > CONFIG.confidence_thres, gy[idx], gx[idx]] = 0.0
+			no_mask[sample[idx], item > CONFIG.confidence_thres, gy[idx], gx[idx]] = False
 		return mask, no_mask, xywh, tcls
 
 	def forward(self, outputs, targets):

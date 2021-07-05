@@ -1,4 +1,3 @@
-from augmentations import RandomHorizontalFlip
 from yolov3.configuration import CONFIG
 from yolov3.yolo_loss import YOLOv3Loss
 from yolov3.network import Network
@@ -17,14 +16,14 @@ class DetectionDataset(torch.utils.data.Dataset):
 		self.__X = sorted([os.path.join(dirs[0], item) for item in os.listdir(dirs[0])])
 		self.__y = sorted([os.path.join(dirs[1], item) for item in os.listdir(dirs[1])])
 		assert len(self.__X) == len(self.__y), f'got {len(self.__X)} imgs but {len(self.__y)} targets'
-		self.__transforms = tsfrm.Compose([
-			tsfrm.Resize((CONFIG.img_dim, CONFIG.img_dim)),
+		self.__default_transforms = tsfrm.Compose([
 			tsfrm.ColorJitter(brightness=1.5, saturation=1.5, hue=0.1),
+			tsfrm.Resize((CONFIG.img_dim, CONFIG.img_dim), interpolation=tsfrm.InterpolationMode.LANCZOS),
 			tsfrm.ToTensor()])
 
 	def __getitem__(self, index: int):
 		bbox_attrs = list()
-		img = self.__transforms(Image.open(self.__X[index]).convert('RGB'))
+		img = self.__default_transforms(Image.open(self.__X[index]).convert('RGB'))
 		with open(self.__y[index], mode='r', newline='') as fd:
 			for ann in csv.reader(fd, quoting=csv.QUOTE_NONNUMERIC):
 				bbox = torch.Tensor([[index] + ann[1:] + [CONFIG.labels.index(ann[0])]])
