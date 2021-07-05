@@ -44,11 +44,10 @@ def save_checkpoint(model, optimizer, scheduler, epoch) -> None:
 	checkpoint = dict({
 		'model': model.state_dict(),
 		'optimizer': optimizer.state_dict(),
-		'scheduler': scheduler.state_dict(),
-		'epoch': epoch})
+		'scheduler': scheduler.state_dict()})
 	torch.save(checkpoint, f'yolov3-chkpt-{epoch}.pth')
 
-def fit(model, optimizer, scheduler, dataset_dir: str, start: int = 0) -> None:
+def fit(model, optimizer, scheduler, dataset_dir: str) -> None:
 	dataset = torch.utils.data.DataLoader(
 		dataset=DetectionDataset(dataset_dir),
 		batch_size=(CONFIG.batch_size // CONFIG.subdivisions),
@@ -57,7 +56,7 @@ def fit(model, optimizer, scheduler, dataset_dir: str, start: int = 0) -> None:
 		num_workers=4)
 	criterion = YOLOv3Loss()
 	model.train()
-	for epoch in range(start, CONFIG.epochs):
+	for epoch in range(scheduler.state_dict().get('last_epoch'), CONFIG.epochs):
 		running_loss = 0.0
 		for minibatch, (images, targets) in enumerate(dataset):
 			outputs = model(images.to(CONFIG.device, non_blocking=True))
@@ -80,6 +79,7 @@ def main() -> None:
 	arguments = parser.parse_args()
 	if arguments.enable_cuda and torch.cuda.is_available() == True:
 		setattr(CONFIG, 'device', torch.device('cuda:' + str(arguments.gpu)))
+	torch.multiprocessing.set_start_method('spawn')
 	model = Network().to(CONFIG.device)
 	optimizer = torch.optim.AdamW(
 		params=model.parameters(),
@@ -89,16 +89,13 @@ def main() -> None:
 		optimizer=optimizer,
 		step_size=(CONFIG.epochs // 3),
 		gamma=CONFIG.lr_decay)
-	start_iteration = 0
 	if arguments.resume and os.path.exists(arguments.resume) == True:
 		print(f'Loading checkpoint `{arguments.resume}`, this might take some time...')
 		checkpoint = torch.load(arguments.resume, map_location=CONFIG.device)
 		model.load_state_dict(checkpoint.get('model'))
 		optimizer.load_state_dict(checkpoint.get('optimizer'))
 		scheduler.load_state_dict(checkpoint.get('scheduler'))
-		start_iteration = checkpoint.get('epoch')
-	torch.multiprocessing.set_start_method('spawn')
-	fit(model, optimizer, scheduler, arguments.dataset, start_iteration)
+	fit(model, optimizer, scheduler, arguments.dataset)
 	torch.save(model.state_dict(), f'pytorch-yolov3-v{CONFIG.version}.pth')
 
 if __name__ == '__main__':
