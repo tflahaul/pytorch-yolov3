@@ -1,15 +1,14 @@
 from torchvision.ops._box_convert import _box_cxcywh_to_xyxy
+from yolov3.configuration import CONFIG
 from typing import Tuple
 
-import torchvision.transforms
+import torchvision.transforms as trsfm
 import torchvision.ops
 import torch
 
-IMG_SIZE = 416
-
-__transformations = torchvision.transforms.Compose([
-	torchvision.transforms.Resize((IMG_SIZE, IMG_SIZE)),
-	torchvision.transforms.ColorJitter(brightness=1.5, saturation=1.5, hue=0.1)])
+__transformations = trsfm.Compose([
+	trsfm.Resize((CONFIG.img_dim, CONFIG.img_dim), interpolation=trsfm.InterpolationMode.LANCZOS),
+	trsfm.ColorJitter(brightness=1.5, saturation=1.5, hue=0.1)])
 
 def _box_resize(boxes: torch.Tensor, in_shape: Tuple[int, int], out_shape: Tuple[int, int]) -> torch.Tensor:
 	resized = boxes.new(boxes.shape)
@@ -42,7 +41,7 @@ def detect_from_single_image(
 	if boxes.size(0) > 0:
 		boxes[..., :4] = _box_cxcywh_to_xyxy(boxes[..., :4])
 		boxes = boxes[torchvision.ops.nms(boxes[..., :4], boxes[..., 4], nms_thres)]
-		boxes[..., :4] = _box_resize(boxes[..., :4], (IMG_SIZE, IMG_SIZE), image.shape[-2:])
+		boxes[..., :4] = _box_resize(boxes[..., :4], (CONFIG.img_dim, CONFIG.img_dim), image.shape[-2:])
 	return boxes
 
 @torch.no_grad()
