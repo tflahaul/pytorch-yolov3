@@ -39,12 +39,12 @@ def collate_batch_items(items: list):
 	targets[:, 0] = targets[:, 0] - targets[0, 0] # indices starts at 0
 	return imgs, targets
 
-def save_checkpoint(model, optimizer, scheduler, epoch) -> None:
+def save_checkpoint(model, optimizer, scheduler) -> None:
 	checkpoint = dict({
 		'model': model.state_dict(),
 		'optimizer': optimizer.state_dict(),
 		'scheduler': scheduler.state_dict()})
-	torch.save(checkpoint, f'yolov3-chkpt-{epoch}.pth')
+	torch.save(checkpoint, f'yolov3-chkpt-{scheduler.last_epoch}.pth')
 
 def fit(model, optimizer, scheduler, dataset_dir: str) -> None:
 	dataset = torch.utils.data.DataLoader(
@@ -55,7 +55,7 @@ def fit(model, optimizer, scheduler, dataset_dir: str) -> None:
 		num_workers=4)
 	criterion = YOLOv3Loss()
 	model.train()
-	for epoch in range(scheduler.state_dict().get('last_epoch'), CONFIG.epochs):
+	for epoch in range(scheduler.last_epoch, CONFIG.epochs):
 		running_loss = 0.0
 		for minibatch, (images, targets) in enumerate(dataset):
 			outputs = model(images.to(CONFIG.device, non_blocking=True))
@@ -67,7 +67,7 @@ def fit(model, optimizer, scheduler, dataset_dir: str) -> None:
 				optimizer.zero_grad()
 		scheduler.step()
 		print(f'epoch {(epoch + 1):>3d}/{CONFIG.epochs:<3d}, loss={running_loss:.6f}, {str(criterion)}')
-		save_checkpoint(model, optimizer, scheduler, epoch + 1)
+		save_checkpoint(model, optimizer, scheduler)
 
 def main() -> None:
 	parser = ArgumentParser(description='YOLOv3 training script')

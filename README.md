@@ -41,14 +41,14 @@ Here is an example (w/ torchvision==0.9.0):
 from detection import detect_from_single_image
 from PIL import Image
 
-import torchvision.transforms as tsfrm
+import torchvision.transforms as trsfm
 import torchvision.utils as utils
 
 model = torch.load('pytorch-yolov3.pth')
-img = tsfrm.ToTensor()(Image.open('nude.png').convert('RGB'))
+img = Image.open('nude.png').convert('RGB')
 boxes = detect_from_single_image(model, img)
-img = tsfrm.ConvertImageDtype(torch.uint8)(img)
+img = trsfm.ConvertImageDtype(torch.uint8)(trsfm.ToTensor()(img))
 img = utils.draw_bounding_boxes(img, boxes[...,:4])
-img = tsfrm.ConvertImageDtype(torch.float32)(img)
+img = trsfm.ConvertImageDtype(torch.float32)(img)
 utils.save_image(img, 'nude_pred.png')
 ```

@@ -1,5 +1,15 @@
 import torch
 
+class CustomCompose(torch.nn.Module):
+	def __init__(self, transforms: list) -> None:
+		super(CustomCompose, self).__init__()
+		self.__transforms = transforms
+
+	def forward(self, image: torch.Tensor, targets: torch.Tensor):
+		for trsfm in self.__transforms:
+			image, targets = trsfm(image, targets)
+		return image, targets
+
 class RandomHorizontalFlip(torch.nn.Module):
 	def __init__(self, p: float = 0.5) -> None:
 		super(RandomHorizontalFlip, self).__init__()
