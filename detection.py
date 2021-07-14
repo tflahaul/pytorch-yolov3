@@ -1,11 +1,14 @@
 from torchvision.ops._box_convert import _box_cxcywh_to_xyxy
 from yolov3.configuration import CONFIG
+from yolov3.network import Network
+from contextlib import contextmanager
 from typing import Tuple
 from PIL import Image
 
 import torchvision.transforms as trsfm
 import torchvision.ops
 import torch
+import os.path
 
 __transformations = trsfm.Compose([
 	trsfm.ColorJitter(brightness=1.5, saturation=1.5, hue=0.1),
@@ -18,12 +21,23 @@ def _box_resize(boxes: torch.Tensor, in_shape: Tuple[int, int], out_shape: Tuple
 	resized[:, 1::2] = boxes[:, 1::2] * (out_shape[0] / in_shape[0])
 	return resized
 
+@contextmanager
+def saved_model(path: str = None, device: torch.device = torch.device('cpu')):
+	net = Network().to(device)
+	if path and os.path.exists(path) == True:
+		model = torch.load(path, map_location=device)
+		if isinstance(dict, model):
+			model = model.get('model')
+		net.load_state_dict(model)
+	yield net
+
 @torch.no_grad()
 def detect_from_single_image(
 	model: torch.nn.Module,
 	image: Image.Image,
 	conf_thres: float = 0.5,
 	nms_thres: float = 0.45,
+	device: torch.device = torch.device('cpu')
 ) -> torch.Tensor:
 	"""
 	Performs a prediction over a single image.
@@ -33,12 +47,13 @@ def detect_from_single_image(
 		image (Tensor): image tensor of shape (3, H, W)
 		conf_thres (float): objectness confidence threshold
 		nms_thres (float): iou threshold used for non-maximum suppression
+		device (device): device to use
 
 	Returns:
 		Tensor[N, 85]: predicted boxes
 	"""
 	model.eval() # set bn layers to evaluation mode
-	out = model(__transformations(image).unsqueeze(0))
+	out = model(__transformations(image).unsqueeze(0).to(device))
 	boxes = torch.cat([x[x[..., 4] > conf_thres] for x in out], 0)
 	if boxes.size(0) > 0:
 		boxes[..., :4] = _box_cxcywh_to_xyxy(boxes[..., :4])
@@ -51,7 +66,8 @@ def detect_from_video_stream(
 	model: torch.nn.Module,
 	stream,
 	conf_thres: float = 0.5,
-	nms_thres: float = 0.45
+	nms_thres: float = 0.45,
+	device: torch.device = torch.device('cpu')
 ) -> torch.Tensor:
 	"""
 	Performs a prediction over a video stream.
@@ -61,6 +77,7 @@ def detect_from_video_stream(
 		stream (): stream of images of shape (3, H, W)
 		conf_thres (float): objectness confidence threshold
 		nms_thres (float): iou threshold used for non-maximum suppression
+		device (device): device to use
 
 	Returns:
 	"""

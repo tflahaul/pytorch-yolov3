@@ -27,7 +27,7 @@ The targets must be CSV files formatted as such:
 "label_0",x1,y1,x2,y2
 "label_1",x1,y1,x2,y2
 ```
-`x1,y1` being the coordinates of the bounding box' upper left corner and `x2,y2` the lower right.<br/>
+`x1,y1` being the coordinates of the bounding box' upper left corner and `x2,y2` the lower right. You have to scale them between 0 and 1 so they are '*image size agnostic*'.<br/>
 
 Other arguments include `enable-cuda` to enable GPU acceleration on CUDA-capable devices (single GPU only, multi-GPU training isn't supported yet) and `resume` to resume training from a checkpoint.
 
@@ -38,17 +38,17 @@ Other arguments include `enable-cuda` to enable GPU acceleration on CUDA-capable
 Here is an example (w/ torchvision==0.9.0):
 
 ```python
-from detection import detect_from_single_image
+from detection import saved_model, detect_from_single_image
 from PIL import Image
 
 import torchvision.transforms as trsfm
 import torchvision.utils as utils
 
-model = torch.load('pytorch-yolov3.pth')
 img = Image.open('nude.png').convert('RGB')
-boxes = detect_from_single_image(model, img)
+with saved_model('pytorch-yolov3.pth') as net:
+	boxes = detect_from_single_image(net, img)
 img = trsfm.ConvertImageDtype(torch.uint8)(trsfm.ToTensor()(img))
 img = utils.draw_bounding_boxes(img, boxes[...,:4])
 img = trsfm.ConvertImageDtype(torch.float32)(img)
-utils.save_image(img, 'nude_pred.png')
+utils.save_image(img, 'out.png')
 ```
