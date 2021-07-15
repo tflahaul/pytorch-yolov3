@@ -8,28 +8,28 @@ from PIL import Image
 import torchvision.transforms as trsfm
 import torchvision.ops
 import torch
-import os.path
+import os
 
 __transformations = trsfm.Compose([
 	trsfm.ColorJitter(brightness=1.5, saturation=1.5, hue=0.1),
 	trsfm.Resize((CONFIG.img_dim, CONFIG.img_dim), interpolation=trsfm.InterpolationMode.LANCZOS),
 	trsfm.ToTensor()])
 
-def _box_resize(boxes: torch.Tensor, in_shape: Tuple[int, int], out_shape: Tuple[int, int]) -> torch.Tensor:
-	resized = boxes.new(boxes.shape)
-	resized[:, 0::2] = boxes[:, 0::2] * (out_shape[1] / in_shape[1])
-	resized[:, 1::2] = boxes[:, 1::2] * (out_shape[0] / in_shape[0])
-	return resized
-
 @contextmanager
 def saved_model(path: str = None, device: torch.device = torch.device('cpu')):
 	net = Network().to(device)
 	if path and os.path.exists(path) == True:
 		model = torch.load(path, map_location=device)
-		if isinstance(dict, model):
+		if isinstance(model, dict):
 			model = model.get('model')
 		net.load_state_dict(model)
 	yield net
+
+def _box_resize(boxes: torch.Tensor, in_shape: Tuple[int, int], out_shape: Tuple[int, int]) -> torch.Tensor:
+	resized = boxes.new(boxes.shape)
+	resized[:, 0::2] = boxes[:, 0::2] * (out_shape[1] / in_shape[1])
+	resized[:, 1::2] = boxes[:, 1::2] * (out_shape[0] / in_shape[0])
+	return resized
 
 @torch.no_grad()
 def detect_from_single_image(
