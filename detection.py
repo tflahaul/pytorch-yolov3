@@ -16,13 +16,18 @@ __transformations = trsfm.Compose([
 	trsfm.ToTensor()])
 
 @contextmanager
-def saved_model(path: str = None, device: torch.device = torch.device('cpu')):
+def saved_model(filename: str = None, device: torch.device = torch.device('cpu')):
+	"""
+	Instantiate a new model from a checkpoint or state_dict.
+
+	Args:
+		filename (str): location of the checkpoint/state_dict
+		device (device): device to use
+	"""
 	net = Network().to(device)
-	if path and os.path.exists(path) == True:
-		model = torch.load(path, map_location=device)
-		if isinstance(model, dict):
-			model = model.get('model')
-		net.load_state_dict(model)
+	if filename and os.path.exists(filename) == True:
+		model = torch.load(filename, map_location=device)
+		net.load_state_dict(model.get('model', model))
 	yield net
 
 def _box_resize(boxes: torch.Tensor, in_shape: Tuple[int, int], out_shape: Tuple[int, int]) -> torch.Tensor:

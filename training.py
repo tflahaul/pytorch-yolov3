@@ -86,7 +86,7 @@ def main() -> None:
 		lr=CONFIG.learning_rate)
 	scheduler = torch.optim.lr_scheduler.StepLR(
 		optimizer=optimizer,
-		step_size=(CONFIG.epochs // 3),
+		step_size=(CONFIG.epochs // 10),
 		gamma=CONFIG.lr_decay)
 	if arguments.resume and os.path.exists(arguments.resume) == True:
 		print(f'Loading checkpoint `{arguments.resume}`, this might take some time...')
