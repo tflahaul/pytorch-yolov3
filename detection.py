@@ -57,7 +57,7 @@ def detect_from_single_image(
 	Returns:
 		Tensor[N, 85]: predicted boxes
 	"""
-	model.eval() # set bn layers to evaluation mode
+	model = model.eval() # set bn layers to evaluation mode
 	out = model(__transformations(image).unsqueeze(0).to(device))
 	boxes = torch.cat([x[x[..., 4] > conf_thres] for x in out], 0)
 	if boxes.size(0) > 0:
@@ -83,7 +83,5 @@ def detect_from_video_stream(
 		conf_thres (float): objectness confidence threshold
 		nms_thres (float): iou threshold used for non-maximum suppression
 		device (device): device to use
-
-	Returns:
 	"""
-	model.eval() # set bn layers to evaluation mode
+	model = model.eval() # set bn layers to evaluation mode

@@ -1,9 +1,12 @@
+from torch._C import TracingState
+from torchvision.transforms.transforms import RandomGrayscale
 from yolov3.configuration import CONFIG
 from yolov3.yolo_loss import YOLOv3Loss
 from yolov3.network import Network
 from argparse import ArgumentParser
 from PIL import Image
 
+import augmentations
 import torchvision.transforms as tsfrm
 import torch
 import csv
@@ -19,7 +22,10 @@ class DetectionDataset(torch.utils.data.Dataset):
 		self.__default_transforms = tsfrm.Compose([
 			tsfrm.ColorJitter(brightness=1.5, saturation=1.5, hue=0.1),
 			tsfrm.Resize((CONFIG.img_dim, CONFIG.img_dim), interpolation=tsfrm.InterpolationMode.LANCZOS),
+			tsfrm.RandomGrayscale(p=0.15),
 			tsfrm.ToTensor()])
+		self.__targets_transforms = augmentations.CustomCompose([
+			augmentations.RandomHorizontalFlip(p=0.1)])
 
 	def __getitem__(self, index: int):
 		bbox_attrs = list()
@@ -28,7 +34,7 @@ class DetectionDataset(torch.utils.data.Dataset):
 			for ann in csv.reader(fd, quoting=csv.QUOTE_NONNUMERIC):
 				bbox = torch.Tensor([[index] + ann[1:] + [CONFIG.labels.index(ann[0])]])
 				bbox_attrs.append(bbox)
-		return img, torch.cat(bbox_attrs, 0)
+		return self.__targets_transforms(img, torch.cat(bbox_attrs, 0))
 
 	def __len__(self) -> int:
 		return len(self.__X)
@@ -54,7 +60,7 @@ def fit(model, optimizer, scheduler, dataset_dir: str) -> None:
 		pin_memory=True,
 		num_workers=4)
 	criterion = YOLOv3Loss()
-	model.train()
+	model = model.train()
 	for epoch in range(scheduler.last_epoch, CONFIG.epochs):
 		running_loss = 0.0
 		for minibatch, (images, targets) in enumerate(dataset):
@@ -84,10 +90,9 @@ def main() -> None:
 		params=model.parameters(),
 		weight_decay=CONFIG.decay,
 		lr=CONFIG.learning_rate)
-	scheduler = torch.optim.lr_scheduler.StepLR(
+	scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
 		optimizer=optimizer,
-		step_size=(CONFIG.epochs // 10),
-		gamma=CONFIG.lr_decay)
+		T_max=CONFIG.epochs)
 	if arguments.resume and os.path.exists(arguments.resume) == True:
 		print(f'Loading checkpoint `{arguments.resume}`, this might take some time...')
 		checkpoint = torch.load(arguments.resume, map_location=CONFIG.device)
