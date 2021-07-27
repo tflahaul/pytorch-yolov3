@@ -1,5 +1,3 @@
-from torch._C import TracingState
-from torchvision.transforms.transforms import RandomGrayscale
 from yolov3.configuration import CONFIG
 from yolov3.yolo_loss import YOLOv3Loss
 from yolov3.network import Network

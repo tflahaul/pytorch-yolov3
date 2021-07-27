@@ -38,15 +38,15 @@ Other arguments include `enable-cuda` to enable GPU acceleration on CUDA-capable
 Here is an example (w/ torchvision==0.9.0):
 
 ```python
-from detection import saved_model, detect_from_single_image
 from PIL import Image
 
 import torchvision.transforms as trsfm
 import torchvision.utils as utils
+import detection
 
 img = Image.open('nude.png').convert('RGB')
-with saved_model('pytorch-yolov3.pth') as net:
-	boxes = detect_from_single_image(net, img)
+net = detection.saved_model('pytorch-yolov3.pth')
+boxes = detection.detect_from_single_image(img, net)
 img = trsfm.ConvertImageDtype(torch.uint8)(trsfm.ToTensor()(img))
 img = utils.draw_bounding_boxes(img, boxes[...,:4])
 img = trsfm.ConvertImageDtype(torch.float32)(img)
