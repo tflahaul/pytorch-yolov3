@@ -9,7 +9,7 @@ import torch
 import os
 
 class __DetectionParameters(object):
-	img_size: int = 416,
+	img_size: int = 416
 	device: torch.device = torch.device('cpu')
 
 CONFIG = __DetectionParameters()
@@ -61,7 +61,7 @@ def detect_from_single_image(
 		nms_thres (float): iou threshold used for non-maximum suppression
 
 	Returns:
-		Tensor[N, 85]: predicted boxes
+		Tensor[N, 85]: predicted boxes in (x1, y1, x2, y2, objness, cls) format
 	"""
 	model = model.eval() # set bn layers to evaluation mode
 	out = model(__transformations(image).unsqueeze(0).to(CONFIG.device))

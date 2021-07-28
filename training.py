@@ -14,8 +14,8 @@ class DetectionDataset(torch.utils.data.Dataset):
 	def __init__(self, dataset_dir: str) -> None:
 		super(DetectionDataset, self).__init__()
 		dirs = sorted([d.path for d in os.scandir(dataset_dir) if d.is_dir()])
-		self.__X = sorted([os.path.join(dirs[0], item) for item in os.listdir(dirs[0])])
-		self.__y = sorted([os.path.join(dirs[1], item) for item in os.listdir(dirs[1])])
+		self.__X = sorted([os.path.join(dirs[0], x) for x in os.listdir(dirs[0])])
+		self.__y = sorted([os.path.join(dirs[1], x) for x in os.listdir(dirs[1])])
 		assert len(self.__X) == len(self.__y), f'got {len(self.__X)} imgs but {len(self.__y)} targets'
 		self.__default_transforms = tsfrm.Compose([
 			tsfrm.ColorJitter(brightness=1.5, saturation=1.5, hue=0.1),

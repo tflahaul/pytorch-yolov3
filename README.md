@@ -27,7 +27,7 @@ The targets must be CSV files formatted as such:
 "label_0",x1,y1,x2,y2
 "label_1",x1,y1,x2,y2
 ```
-`x1,y1` being the coordinates of the bounding box' upper left corner and `x2,y2` the lower right. You have to scale them between 0 and 1 so they are '*image size agnostic*'.<br/>
+`x1,y1` being the coordinates of the bounding box' upper left corner and `x2,y2` the lower right. You have to scale them between 0 and 1 so they're agnostic to the size of the image.<br/>
 
 Other arguments include `enable-cuda` to enable GPU acceleration on CUDA-capable devices (single GPU only, multi-GPU training isn't supported yet) and `resume` to resume training from a checkpoint.
 
