@@ -1,8 +1,10 @@
+from typing import Iterable
+
 import functools
 import torch
 
 class RouteLayer(torch.nn.Module):
-	def __init__(self, layers: list) -> None:
+	def __init__(self, layers: Iterable) -> None:
 		super(RouteLayer, self).__init__()
 		self.indexes = layers
 
@@ -12,7 +14,7 @@ class ShortcutLayer(torch.nn.Module):
 		self.index = from_index
 
 class YoloDetectionLayer(torch.nn.Module):
-	def __init__(self, anchors, img_size, classes) -> None:
+	def __init__(self, anchors: Iterable, img_size: int, classes: int) -> None:
 		super(YoloDetectionLayer, self).__init__()
 		self.__bbox_attrs = (5 + classes) # (tx, ty, tw, th, obj, cls)
 		self.__anchors = torch.Tensor(anchors)
@@ -20,15 +22,15 @@ class YoloDetectionLayer(torch.nn.Module):
 		self.__imsize = img_size
 
 	@functools.cache
-	def __grid_offsets(self, size: int):
+	def __grid_offsets(self, size: int) -> torch.Tensor:
 		grid = torch.arange(size).repeat(size, 1)
 		return torch.stack((grid, grid.t()), -1).view(1, 1, size, size, 2)
 
-	def forward(self, inputs: torch.Tensor):
+	def forward(self, inputs: torch.Tensor) -> torch.Tensor:
 		samples, _, y, x = inputs.shape
 		stride = self.__imsize // y
 		g = self.__imsize // stride
-		self.out = inputs.view(samples, self.__nb_anchors, y, x, self.__bbox_attrs).contiguous()
+		self.out = inputs.view(samples, self.__nb_anchors, y, x, self.__bbox_attrs)
 		self.scaled_anchors = self.__anchors.true_divide(stride).to(inputs.device)
 		self.out[..., :2] = torch.sigmoid(self.out[..., :2])
 		self.out[..., 4:] = torch.sigmoid(self.out[..., 4:])

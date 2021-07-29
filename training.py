@@ -13,17 +13,18 @@ import os
 class DetectionDataset(torch.utils.data.Dataset):
 	def __init__(self, dataset_dir: str) -> None:
 		super(DetectionDataset, self).__init__()
-		dirs = sorted([d.path for d in os.scandir(dataset_dir) if d.is_dir()])
-		self.__X = sorted([os.path.join(dirs[0], x) for x in os.listdir(dirs[0])])
-		self.__y = sorted([os.path.join(dirs[1], x) for x in os.listdir(dirs[1])])
+		dirs = sorted((d.path for d in os.scandir(dataset_dir) if d.is_dir()))
+		self.__X = sorted((os.path.join(dirs[0], x) for x in os.listdir(dirs[0])))
+		self.__y = sorted((os.path.join(dirs[1], x) for x in os.listdir(dirs[1])))
 		assert len(self.__X) == len(self.__y), f'got {len(self.__X)} imgs but {len(self.__y)} targets'
-		self.__default_transforms = tsfrm.Compose([
+		self.__default_transforms = tsfrm.Compose((
 			tsfrm.ColorJitter(brightness=1.5, saturation=1.5, hue=0.1),
 			tsfrm.Resize((CONFIG.img_dim, CONFIG.img_dim), interpolation=tsfrm.InterpolationMode.LANCZOS),
 			tsfrm.RandomGrayscale(p=0.15),
-			tsfrm.ToTensor()])
-		self.__targets_transforms = augmentations.CustomCompose([
-			augmentations.RandomHorizontalFlip(p=0.1)])
+			tsfrm.ToTensor(),
+			tsfrm.Normalize(mean=(0.491, 0.482, 0.447), std=(0.202, 0.199, 0.201))))
+		self.__targets_transforms = augmentations.CustomCompose((
+			augmentations.RandomHorizontalFlip(p=0.1)))
 
 	def __getitem__(self, index: int):
 		bbox_attrs = list()
@@ -38,8 +39,8 @@ class DetectionDataset(torch.utils.data.Dataset):
 		return len(self.__X)
 
 def collate_batch_items(items: list):
-	imgs = torch.stack((list(zip(*items)))[0])
-	targets = torch.cat((list(zip(*items)))[1])
+	imgs = torch.stack((tuple(zip(*items)))[0])
+	targets = torch.cat((tuple(zip(*items)))[1])
 	targets[:, 0] = targets[:, 0] - targets[0, 0] # indices starts at 0
 	return imgs, targets
 
