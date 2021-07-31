@@ -21,26 +21,25 @@ class DetectionDataset(torch.utils.data.Dataset):
 			tsfrm.ColorJitter(brightness=1.5, saturation=1.5, hue=0.1),
 			tsfrm.Resize((CONFIG.img_dim, CONFIG.img_dim), interpolation=tsfrm.InterpolationMode.LANCZOS),
 			tsfrm.RandomGrayscale(p=0.15),
-			tsfrm.ToTensor(),
-			tsfrm.Normalize(mean=(0.491, 0.482, 0.447), std=(0.202, 0.199, 0.201))))
+			tsfrm.ToTensor()))
 		self.__targets_transforms = augmentations.CustomCompose((
-			augmentations.RandomHorizontalFlip(p=0.1)))
+			augmentations.RandomHorizontalFlip(p=0.1),))
 
 	def __getitem__(self, index: int):
-		bbox_attrs = list()
+		bounding_boxes = list()
 		img = self.__default_transforms(Image.open(self.__X[index]).convert('RGB'))
 		with open(self.__y[index], mode='r', newline='') as fd:
 			for ann in csv.reader(fd, quoting=csv.QUOTE_NONNUMERIC):
 				bbox = torch.Tensor([[index] + ann[1:] + [CONFIG.labels.index(ann[0])]])
-				bbox_attrs.append(bbox)
-		return self.__targets_transforms(img, torch.cat(bbox_attrs, 0))
+				bounding_boxes.append(bbox)
+		return self.__targets_transforms(img, torch.cat(bounding_boxes, 0))
 
 	def __len__(self) -> int:
 		return len(self.__X)
 
 def collate_batch_items(items: list):
-	imgs = torch.stack((tuple(zip(*items)))[0])
-	targets = torch.cat((tuple(zip(*items)))[1])
+	imgs = torch.stack(tuple(zip(*items))[0])
+	targets = torch.cat(tuple(zip(*items))[1])
 	targets[:, 0] = targets[:, 0] - targets[0, 0] # indices starts at 0
 	return imgs, targets
 

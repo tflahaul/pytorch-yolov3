@@ -17,10 +17,10 @@ class RandomHorizontalFlip(torch.nn.Module):
 
 	def forward(self, image: torch.Tensor, targets: torch.Tensor):
 		if torch.rand(1) < self.p:
+			image = image.flip(-1)
 			boxes = targets[:, 1:5]
 			boxes[:, ::2] = 1.0 - boxes[:, [2, 0]]
 			targets[:, 1:5] = boxes
-			image = image.flip(-1)
 		return image, targets
 
 class RandomRotate(torch.nn.Module):

@@ -1,6 +1,6 @@
 from torchvision.ops._box_convert import _box_cxcywh_to_xyxy
 from yolov3.network import Network
-from typing import Optional, Tuple
+from typing import Optional, Union, Tuple
 from PIL import Image
 
 import torchvision.transforms as trsfm
@@ -17,12 +17,11 @@ CONFIG = __DetectionParameters()
 __transformations = trsfm.Compose((
 	trsfm.ColorJitter(brightness=1.5, saturation=1.5, hue=0.1),
 	trsfm.Resize((CONFIG.img_size, CONFIG.img_size), interpolation=trsfm.InterpolationMode.LANCZOS),
-	trsfm.ToTensor(),
-	trsfm.Normalize(mean=(0.491, 0.482, 0.447), std=(0.202, 0.199, 0.201))))
+	trsfm.ToTensor()))
 
 def set_detection_parameters(
 	img_size: Optional[int] = None,
-	device: Optional[torch.device] = None
+	device: Optional[Union[torch.device, str]] = None
 ) -> None:
 	if img_size is not None and img_size > 0:
 		CONFIG.img_size = img_size

@@ -31,7 +31,7 @@ def shortcut(item, out_filters):
 	return ShortcutLayer(item.get('from'))
 
 def route(item, out_filters):
-	out_filters.append(sum([out_filters[1:][x] for x in item.get('layers')]))
+	out_filters.append(sum((out_filters[1:][x] for x in item.get('layers'))))
 	return RouteLayer(item.get('layers'))
 
 def yolo(item, out_filters):
