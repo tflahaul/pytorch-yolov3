@@ -20,10 +20,11 @@ class DetectionDataset(torch.utils.data.Dataset):
 		self.__default_transforms = tsfrm.Compose((
 			tsfrm.ColorJitter(brightness=1.5, saturation=1.5, hue=0.1),
 			tsfrm.Resize((CONFIG.img_dim, CONFIG.img_dim), interpolation=tsfrm.InterpolationMode.LANCZOS),
-			tsfrm.RandomGrayscale(p=0.15),
-			tsfrm.ToTensor()))
+			tsfrm.RandomGrayscale(p=0.10),
+			tsfrm.ToTensor(),
+			tsfrm.Normalize(mean=(0.5, 0.5, 0.5), std=(0.5, 0.5, 0.5))))
 		self.__targets_transforms = augmentations.CustomCompose((
-			augmentations.RandomHorizontalFlip(p=0.1),))
+			augmentations.RandomHorizontalFlip(p=0.05),))
 
 	def __getitem__(self, index: int):
 		bounding_boxes = list()
@@ -50,7 +51,7 @@ def save_checkpoint(model, optimizer, scheduler) -> None:
 		'scheduler': scheduler.state_dict()})
 	torch.save(checkpoint, f'yolov3-chkpt-{scheduler.last_epoch}.pth')
 
-def fit(model, optimizer, scheduler, dataset_dir: str) -> None:
+def fit(model, optimizer, scheduler, dataset_dir: str, steps: int) -> None:
 	dataset = torch.utils.data.DataLoader(
 		dataset=DetectionDataset(dataset_dir),
 		batch_size=(CONFIG.batch_size // CONFIG.subdivisions),
@@ -60,6 +61,7 @@ def fit(model, optimizer, scheduler, dataset_dir: str) -> None:
 	criterion = YOLOv3Loss()
 	model = model.train()
 	for epoch in range(scheduler.last_epoch, CONFIG.epochs):
+		optimizer.zero_grad()
 		running_loss = 0.0
 		for minibatch, (images, targets) in enumerate(dataset):
 			outputs = model(images.to(CONFIG.device, non_blocking=True))
@@ -69,17 +71,21 @@ def fit(model, optimizer, scheduler, dataset_dir: str) -> None:
 			if (minibatch + 1) % CONFIG.subdivisions == 0:
 				optimizer.step()
 				optimizer.zero_grad()
+		optimizer.step() # for examples that doesn't fill the last batch
 		scheduler.step()
 		print(f'epoch {(epoch + 1):>3d}/{CONFIG.epochs:<3d}, loss={running_loss:.6f}, {str(criterion)}')
-		save_checkpoint(model, optimizer, scheduler)
+		if (epoch + 1) % steps == 0:
+			save_checkpoint(model, optimizer, scheduler)
 
 def main() -> None:
 	parser = ArgumentParser(description='YOLOv3 training script')
 	parser.add_argument('dataset', type=str, help='dataset folder')
 	parser.add_argument('--resume', type=str, metavar='checkpoint', help='resume from checkpoint')
+	parser.add_argument('-s', '--step', type=int, default=1, help='step between checkpoints')
 	parser.add_argument('--enable-cuda', action='store_true', help='enable CUDA')
 	parser.add_argument('--gpu', type=int, default=0, help='GPU index')
 	arguments = parser.parse_args()
+	assert arguments.steps > 0, 'step between checkpoints must be greater than 0'
 	if arguments.enable_cuda and torch.cuda.is_available() == True:
 		setattr(CONFIG, 'device', torch.device('cuda:' + str(arguments.gpu)))
 	torch.multiprocessing.set_start_method('spawn')
@@ -97,7 +103,7 @@ def main() -> None:
 		model.load_state_dict(checkpoint.get('model'))
 		optimizer.load_state_dict(checkpoint.get('optimizer'))
 		scheduler.load_state_dict(checkpoint.get('scheduler'))
-	fit(model, optimizer, scheduler, arguments.dataset)
+	fit(model, optimizer, scheduler, arguments.dataset, arguments.steps)
 	torch.save(model.state_dict(), f'pytorch-yolov3-v{CONFIG.version}.pth')
 
 if __name__ == '__main__':

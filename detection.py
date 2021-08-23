@@ -17,7 +17,8 @@ CONFIG = __DetectionParameters()
 __transformations = trsfm.Compose((
 	trsfm.ColorJitter(brightness=1.5, saturation=1.5, hue=0.1),
 	trsfm.Resize((CONFIG.img_size, CONFIG.img_size), interpolation=trsfm.InterpolationMode.LANCZOS),
-	trsfm.ToTensor()))
+	trsfm.ToTensor(),
+	trsfm.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))))
 
 def set_detection_parameters(
 	img_size: Optional[int] = None,
