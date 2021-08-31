@@ -44,7 +44,7 @@ import torchvision.transforms as trsfm
 import torchvision.utils as utils
 import detection
 
-img = Image.open('nude.png').convert('RGB')
+img = Image.open('in.png').convert('RGB')
 net = detection.saved_model('pytorch-yolov3.pth')
 boxes = detection.detect_from_single_image(img, net)
 img = trsfm.ConvertImageDtype(torch.uint8)(trsfm.ToTensor()(img))
