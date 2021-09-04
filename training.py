@@ -100,6 +100,8 @@ def main() -> None:
 	if arguments.resume and os.path.exists(arguments.resume) == True:
 		print(f'Loading checkpoint `{arguments.resume}`, this might take some time...')
 		checkpoint = torch.load(arguments.resume, map_location=CONFIG.device)
+		if not set({'model', 'optimizer', 'scheduler'}).issubset(checkpoint.keys()):
+			raise ValueError('error: badly formatted checkpoint')
 		model.load_state_dict(checkpoint.get('model'))
 		optimizer.load_state_dict(checkpoint.get('optimizer'))
 		scheduler.load_state_dict(checkpoint.get('scheduler'))
