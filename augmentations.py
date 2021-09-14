@@ -23,17 +23,6 @@ class RandomHorizontalFlip(torch.nn.Module):
 			targets[:, 1:5] = boxes
 		return image, targets
 
-class RandomGaussianNoise(torch.nn.Module):
-	def __init__(self, p: float = 0.5, intensity: float = 0.25) -> None:
-		super(RandomGaussianNoise, self).__init__()
-		self.std = intensity
-		self.p = p
-
-	def forward(self, image: torch.Tensor, targets: torch.Tensor):
-		if torch.rand(1) < self.p:
-			image = image + torch.normal(0.0, self.std, size=image.shape)
-		return image, targets
-
 class RandomRotate(torch.nn.Module):
 	def __init__(self, p: float = 0.5):
 		super(RandomRotate, self).__init__()
@@ -46,3 +35,15 @@ class RandomRotate(torch.nn.Module):
 #			rotate boxes here
 			targets[:, 1:5] = boxes
 		return image, targets
+
+class RandomGaussianNoise(torch.nn.Module):
+	def __init__(self, p: float = 0.5, intensity: float = 0.25) -> None:
+		super(RandomGaussianNoise, self).__init__()
+		self.std = intensity
+		self.p = p
+
+	def forward(self, image: torch.Tensor) -> torch.Tensor:
+		if torch.rand(1) < self.p:
+			noise = torch.normal(0, self.std, size=image.shape[1:]).repeat(image.size(0), 1, 1)
+			image = image + noise
+		return image

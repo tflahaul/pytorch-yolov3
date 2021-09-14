@@ -20,6 +20,7 @@ class DetectionDataset(torch.utils.data.Dataset):
 			tsfrm.Resize((CONFIG.img_dim, CONFIG.img_dim), interpolation=tsfrm.InterpolationMode.LANCZOS),
 			tsfrm.RandomGrayscale(p=0.10),
 			tsfrm.ToTensor(),
+			augmentations.RandomGaussianNoise(p=0.04, intensity=0.15),
 			tsfrm.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225))))
 		self.__targets_transforms = augmentations.CustomCompose((
 			augmentations.RandomHorizontalFlip(p=0.03),))
@@ -92,7 +93,7 @@ def main() -> None:
 		params=model.parameters(),
 		weight_decay=CONFIG.decay,
 		lr=CONFIG.learning_rate)
-	scheduler = torch.optim.lr_scheduler.OneCycleLR(
+	scheduler = torch.optim.lr_scheduler.OneCycleLR( # https://arxiv.org/abs/1708.07120
 		optimizer=optimizer,
 		max_lr=CONFIG.learning_rate,
 		steps_per_epoch=len(dataset),
@@ -101,7 +102,7 @@ def main() -> None:
 		print(f'Loading checkpoint `{arguments.resume}`, this might take some time...')
 		checkpoint = torch.load(arguments.resume, map_location=CONFIG.device)
 		if not set({'model', 'optimizer', 'scheduler'}).issubset(checkpoint.keys()):
-			raise ValueError('error: badly formatted checkpoint')
+			raise SystemExit('error: badly formatted checkpoint')
 		model.load_state_dict(checkpoint.get('model'))
 		optimizer.load_state_dict(checkpoint.get('optimizer'))
 		scheduler.load_state_dict(checkpoint.get('scheduler'))
